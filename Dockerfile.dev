@@ -1,0 +1,30 @@
+FROM python:3.12-bookworm
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    build-essential git ffmpeg libsm6 libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Clone the rainbow tables with retry mechanism and verbose output
+RUN for i in $(seq 1 3); do \
+    echo "Attempt $i: Cloning repository..." && \
+    git clone -v https://github.com/inAudible-NG/tables.git /app/audible_rainbow_tables && \
+    ls -la /app/audible_rainbow_tables && \
+    break || \
+    if [ $i -eq 3 ]; then \
+        echo "All clone attempts failed" && exit 1; \
+    fi; \
+    echo "Retrying git clone..."; \
+    sleep 2; \
+    done
+
+COPY . .
+
+EXPOSE 8080
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
