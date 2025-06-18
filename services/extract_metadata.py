@@ -3,9 +3,12 @@ import json
 import os
 import hashlib
 from pathlib import Path
-from datetime import datetime, timedelta
-import csv
+from datetime import datetime
 import mimetypes
+from config import logger
+import base64
+import tempfile
+from models import AudiobookMetadata, Chapter, ActivationBytes
 
 
 class AudiobookMetadataExtractor:
@@ -51,7 +54,7 @@ class AudiobookMetadataExtractor:
                     sha1_hash.update(chunk)
             return sha1_hash.hexdigest()
         except Exception as e:
-            print(f"Error calculating file checksum: {e}")
+            logger.error(f"Error calculating file checksum: {e}")
             return "Unknown"
 
     def get_mime_type(self):
@@ -91,12 +94,14 @@ class AudiobookMetadataExtractor:
             return True
 
         except subprocess.CalledProcessError as e:
-            print(f"Error extracting metadata: {e}")
+            logger.error(f"Error extracting metadata: {e}")
             if "Invalid data found when processing input" in str(e):
-                print("This may be due to incorrect activation bytes for AAX file")
+                logger.info(
+                    "This may be due to incorrect activation bytes for AAX file"
+                )
             return False
         except json.JSONDecodeError as e:
-            print(f"Error parsing metadata: {e}")
+            logger.error(f"Error parsing metadata: {e}")
             return False
 
     def get_file_info(self):
@@ -122,7 +127,7 @@ class AudiobookMetadataExtractor:
                 "Checksum": file_checksum,
             }
         except Exception as e:
-            print(f"Error getting file info: {e}")
+            logger.error(f"Error getting file info: {e}")
             return {}
 
     def get_track_info(self):
@@ -167,73 +172,73 @@ class AudiobookMetadataExtractor:
 
     def print_file_info(self, activation_bytes=None):
         """Print file information in AAX format"""
-        print("File")
+        logger.info("File")
         file_info = self.get_file_info(activation_bytes)
 
         for key, value in file_info.items():
-            print(f"{key}:")
-            print(f"{value}")
+            logger.info(f"{key}:")
+            logger.info(f"{value}")
 
     def print_track_info(self):
         """Print track information in AAX format"""
-        print("\nTrack Infos")
+        logger.info("\nTrack Infos")
         track_info = self.get_track_info()
 
         for key, value in track_info.items():
-            print(f"{key}:")
-            print(f"{value}")
+            logger.info(f"{key}:")
+            logger.info(f"{value}")
 
     def print_chapters_detailed(self):
         """Print detailed chapter information"""
-        print("\n" + "=" * 60)
-        print("DETAILED CHAPTERS")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("DETAILED CHAPTERS")
+        logger.info("=" * 60)
 
         if "chapters" not in self.metadata or not self.metadata["chapters"]:
-            print("No chapters found")
+            logger.info("No chapters found")
             return
 
         chapters = self.metadata["chapters"]
-        print(f"Total Chapters: {len(chapters)}\n")
+        logger.info(f"Total Chapters: {len(chapters)}\n")
 
         for i, chapter in enumerate(chapters, 1):
             start_time = float(chapter.get("start_time", 0))
             end_time = float(chapter.get("end_time", 0))
             duration = end_time - start_time
 
-            print(f"Chapter {i:2d}:")
-            print(f"  Start Time: {self.format_duration(start_time)}")
-            print(f"  End Time: {self.format_duration(end_time)}")
-            print(f"  Duration: {self.format_duration(duration)}")
+            logger.info(f"Chapter {i:2d}:")
+            logger.info(f"  Start Time: {self.format_duration(start_time)}")
+            logger.info(f"  End Time: {self.format_duration(end_time)}")
+            logger.info(f"  Duration: {self.format_duration(duration)}")
 
             # Chapter title
             title = chapter.get("tags", {}).get("title", f"Chapter {i}")
-            print(f"  Title: {title}")
-            print()
+            logger.info(f"  Title: {title}")
+            logger.info()
 
     def test_activation_bytes(self, activation_bytes_list):
         """Test multiple activation bytes to find the correct one"""
-        print("Testing activation bytes...")
+        logger.info("Testing activation bytes...")
 
         file_checksum = self.get_file_checksum()
 
         for i, activation_bytes in enumerate(activation_bytes_list, 1):
-            print(f"Testing #{i}: {activation_bytes}")
+            logger.info(f"Testing #{i}: {activation_bytes}")
 
             # Calculate AAX checksum
             aax_checksum = self.calculate_aax_checksum(activation_bytes)
 
             if aax_checksum:
-                print(f"  AAX Checksum: {aax_checksum}")
+                logger.info(f"  AAX Checksum: {aax_checksum}")
 
                 # Try to extract metadata with these activation bytes
                 if self.extract_full_metadata(activation_bytes):
-                    print(f"  ✓ Successfully extracted metadata")
+                    logger.info(f"  ✓ Successfully extracted metadata")
                     return activation_bytes
                 else:
-                    print(f"  ✗ Failed to extract metadata")
+                    logger.info(f"  ✗ Failed to extract metadata")
             else:
-                print(f"  ✗ Failed to calculate checksum")
+                logger.info(f"  ✗ Failed to calculate checksum")
 
         return None
 
@@ -271,15 +276,15 @@ class AudiobookMetadataExtractor:
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-            print(f"\nAAX-format metadata exported to: {output_file}")
+            logger.info(f"\nAAX-format metadata exported to: {output_file}")
             return True
         except Exception as e:
-            print(f"Error exporting to JSON: {e}")
+            logger.error(f"Error exporting to JSON: {e}")
             return False
 
     def print_all_metadata_aax_format(self, activation_bytes=None):
         """Print all metadata in AAX format"""
-        print("=" * 60)
+        logger.info("=" * 60)
 
         # First, try to extract metadata
         success = self.extract_full_metadata(activation_bytes)
@@ -291,8 +296,96 @@ class AudiobookMetadataExtractor:
             self.print_track_info()
             self.print_chapters_detailed()
         else:
-            print("\nCould not extract detailed metadata.")
+            logger.info("\nCould not extract detailed metadata.")
             if self.input_file.suffix.lower() == ".aax":
-                print("For AAX files, you may need correct activation bytes.")
+                logger.info("For AAX files, you may need correct activation bytes.")
 
         return success
+
+    def get_album_in_base64_string(self):
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True) as tmp_img:
+            try:
+                cmd = [
+                    "ffmpeg",
+                    "-y",  # Overwrite output file if exists
+                    "-i",
+                    str(self.input_file),
+                    "-an",  # no audio
+                    "-vcodec",
+                    "copy",
+                    "-map",
+                    "0:v:0",
+                    tmp_img.name,
+                ]
+                subprocess.run(cmd, capture_output=True, check=True)
+                tmp_img.seek(0)
+                img_bytes = tmp_img.read()
+                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                return img_b64
+            except Exception as e:
+                logger.error(f"Error extracting album art: {e}")
+                return ""
+
+    def get_complete_metadata_using_activation_bytes(self, activation_bytes):
+        """Extract all metadata using ffprobe"""
+        try:
+            cmd = [
+                "ffprobe",
+                "-i",
+                str(self.input_file),
+                "-activation_bytes",
+                activation_bytes,
+                "-print_format",
+                "json",
+                "-show_format",
+                "-show_streams",
+                "-show_chapters",
+                "-v",
+                "error",
+            ]
+            logger.info(f"Running command: {' '.join(cmd)}")
+
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            self.metadata = json.loads(result.stdout)
+            return True
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error extracting metadata: {e}")
+            if "Invalid data found when processing input" in str(e):
+                logger.info(
+                    "This may be due to incorrect activation bytes for AAX file"
+                )
+            return False
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing metadata: {e}")
+            return False
+
+    def get_complete_metadata(self) -> AudiobookMetadata:
+        """Get complete metadata"""
+        chapters = []
+        if "chapters" in self.metadata:
+            for chapter in self.metadata["chapters"]:
+                chapters.append(
+                    Chapter(
+                        title=chapter.get("tags", {}).get("title"),
+                        start_time=float(chapter.get("start_time", 0)),
+                        end_time=float(chapter.get("end_time", 0)),
+                        start_absolute=float(chapter.get("start", 0)),
+                        end_absolute=float(chapter.get("end", 0)),
+                    )
+                )
+
+        return AudiobookMetadata(
+            title=self.metadata["format"]["tags"]["title"],
+            author=self.metadata["format"]["tags"]["artist"],
+            duration=float(self.metadata["format"]["duration"]),
+            duration_formatted=self.format_duration(
+                float(self.metadata["format"]["duration"])
+            ),
+            bitrate=int(self.metadata["format"]["bit_rate"]),
+            size=int(self.metadata["format"]["size"]),
+            size_formatted=self.format_file_size(int(self.metadata["format"]["size"])),
+            chapters=chapters,
+            album_art=self.get_album_in_base64_string(),
+            raw_metadata=self.metadata,
+        )

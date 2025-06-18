@@ -4,10 +4,12 @@ import os
 import json
 import sys
 from pathlib import Path
+from config import logger
+import requests
 
 
 class AAXProcessor:
-    def __init__(self, tables_path="."):
+    def __init__(self, tables_path="/app/audible_rainbow_tables"):
         """
         Initialize AAX processor.
 
@@ -69,17 +71,17 @@ class AAXProcessor:
 
             if match:
                 checksum = match.group(1)
-                print(f"Found SHA1 checksum: {checksum}")
+                logger.info(f"Found SHA1 checksum: {checksum}")
                 return checksum
             else:
-                print("No checksum found in ffprobe output")
-                print("Output:", output)
+                logger.info("No checksum found in ffprobe output")
+                logger.info("Output:", output)
                 return None
 
         except FileNotFoundError:
             raise FileNotFoundError("ffprobe not found. Please install FFmpeg.")
         except subprocess.CalledProcessError as e:
-            print(f"Error running ffprobe: {e}")
+            logger.error(f"Error running ffprobe: {e}")
             return None
 
     def recover_activation_bytes(self, checksum):
@@ -93,8 +95,8 @@ class AAXProcessor:
             str: Activation bytes if found, None otherwise
         """
         try:
-            print(f"Attempting to crack checksum: {checksum}")
-            print(f"Using rainbow tables in: {self.tables_path}")
+            logger.info(f"Attempting to crack checksum: {checksum}")
+            logger.info(f"Using rainbow tables in: {self.tables_path}")
 
             orginal_dir = os.getcwd()
             os.chdir(self.tables_path)
@@ -104,11 +106,11 @@ class AAXProcessor:
                 capture_output=True,
                 text=True,
             )
-            print(" ".join(result.args))
+            logger.info(" ".join(result.args))
 
             output = result.stdout + result.stderr
-            print("RainbowCrack output:")
-            print(output)
+            logger.info("RainbowCrack output:")
+            logger.info(output)
 
             # Parse the output to find activation bytes
             # Look for patterns like "plaintext of [hash] is [bytes]"
@@ -117,14 +119,16 @@ class AAXProcessor:
 
             if match:
                 activation_bytes = match.group(1)
-                print(f"Successfully recovered activation bytes: {activation_bytes}")
+                logger.info(
+                    f"Successfully recovered activation bytes: {activation_bytes}"
+                )
                 return activation_bytes
             else:
-                print("Could not find activation bytes in output")
+                logger.info("Could not find activation bytes in output")
                 return None
 
         except subprocess.CalledProcessError as e:
-            print(f"Error running rcrack: {e}")
+            logger.error(f"Error running rcrack: {e}")
             return None
         finally:
             os.chdir(orginal_dir)
@@ -142,7 +146,7 @@ class AAXProcessor:
         if not os.path.isfile(aax_file):
             raise FileNotFoundError(f"AAX file not found: {aax_file}")
 
-        print(f"Processing AAX file: {aax_file}")
+        logger.info(f"Processing AAX file: {aax_file}")
 
         # Step 1: Extract SHA1 checksum
         checksum = self.extract_sha1_checksum(aax_file)
@@ -157,10 +161,10 @@ class AAXProcessor:
                 data = {}
 
             if checksum in data:
-                print(f"Activation bytes already found for checksum: {checksum}")
+                logger.info(f"Activation bytes already found for checksum: {checksum}")
                 return {"checksum": checksum, "activation_bytes": data[checksum]}
             else:
-                print(f"Activation bytes not found for checksum: {checksum}")
+                logger.info(f"Activation bytes not found for checksum: {checksum}")
 
         # Step 2: Recover activation bytes
         activation_bytes = self.recover_activation_bytes(checksum)
@@ -176,5 +180,45 @@ class AAXProcessor:
 
             data[checksum] = activation_bytes
             json.dump(data, f, indent=4)
+
+        return {"checksum": checksum, "activation_bytes": activation_bytes}
+
+    def get_activation_bytes_via_http_api(self, checksum):
+        url = "https://aaxactivationserviceapi.azurewebsites.net/api/v1/activation/{}".format(
+            checksum
+        )
+        logger.info(f"Getting activation bytes via HTTP API: {url}")
+        response = requests.get(url)
+        if response.status_code == 200:
+            logger.info(f"Activation bytes: {response.text}")
+            return response.text
+        else:
+            logger.error(f"Failed to get activation bytes: {response.status_code}")
+            return None
+
+    def get_activation_bytes(self, aax_file):
+        checksum = self.extract_sha1_checksum(aax_file)
+        if not checksum:
+            return {"checksum": checksum, "error": "Could not extract SHA1 checksum"}
+        # check if activation bytes is already in the json file
+        with open("activation_bytes.json", "r") as f:
+            data = json.load(f)
+            if checksum in data:
+                logger.info(
+                    f"Activation bytes already found for checksum {checksum} in json file"
+                )
+                return {"checksum": checksum, "activation_bytes": data[checksum]}
+            else:
+                logger.info(
+                    f"Activation bytes not found for checksum {checksum} in json file"
+                )
+
+        activation_bytes = self.get_activation_bytes_via_http_api(checksum)
+        if not activation_bytes:
+            logger.info("Could not get activation bytes")
+            logger.info("Trying to recover activation bytes using rainbow tables")
+            activation_bytes = self.recover_activation_bytes(checksum)
+            if not activation_bytes:
+                return {"checksum": checksum, "error": "Could not get activation bytes"}
 
         return {"checksum": checksum, "activation_bytes": activation_bytes}
