@@ -17,13 +17,35 @@ class AudiobookMetadataExtractor:
         self.metadata = {}
 
     def format_duration(self, seconds):
-        """Convert seconds to H:MM:SS format"""
+        """Convert seconds to readable format with appropriate units"""
         try:
             seconds = float(seconds)
-            hours = int(seconds // 3600)
-            minutes = int((seconds % 3600) // 60)
-            secs = int(seconds % 60)
-            return f"{hours}:{minutes:02d}:{secs:02d}"
+
+            # Handle very short durations
+            if seconds < 60:
+                return f"{seconds:.1f} seconds" if seconds != 1 else "1 second"
+
+            # Handle minutes
+            elif seconds < 3600:  # Less than 1 hour
+                minutes = seconds / 60
+                if minutes < 2:
+                    return f"{minutes:.1f} minute"
+                return f"{minutes:.1f} minutes"
+
+            # Handle hours
+            elif seconds < 86400:  # Less than 1 day (24 hours)
+                hours = seconds / 3600
+                if hours < 2:
+                    return f"{hours:.1f} hour"
+                return f"{hours:.1f} hours"
+
+            # Handle days
+            else:
+                days = seconds / 86400
+                if days < 2:
+                    return f"{days:.1f} day"
+                return f"{days:.1f} days"
+
         except (ValueError, TypeError):
             return "Unknown"
 
@@ -31,7 +53,17 @@ class AudiobookMetadataExtractor:
         """Format bitrate to readable format"""
         try:
             bitrate = int(bitrate)
-            return str(bitrate)
+
+            # Convert bits per second to kilobits per second
+            if bitrate >= 1000000:  # 1 Mbps or higher
+                mbps = bitrate // 1000000
+                return f"{mbps:.1f} Mbps"
+            elif bitrate >= 1000:  # 1 kbps or higher
+                kbps = bitrate // 1000
+                return f"{kbps:.0f} kbps"
+            else:
+                return f"{bitrate} bps"
+
         except (ValueError, TypeError):
             return "Unknown"
 
@@ -170,138 +202,6 @@ class AudiobookMetadataExtractor:
 
         return track_info
 
-    def print_file_info(self, activation_bytes=None):
-        """Print file information in AAX format"""
-        logger.info("File")
-        file_info = self.get_file_info(activation_bytes)
-
-        for key, value in file_info.items():
-            logger.info(f"{key}:")
-            logger.info(f"{value}")
-
-    def print_track_info(self):
-        """Print track information in AAX format"""
-        logger.info("\nTrack Infos")
-        track_info = self.get_track_info()
-
-        for key, value in track_info.items():
-            logger.info(f"{key}:")
-            logger.info(f"{value}")
-
-    def print_chapters_detailed(self):
-        """Print detailed chapter information"""
-        logger.info("\n" + "=" * 60)
-        logger.info("DETAILED CHAPTERS")
-        logger.info("=" * 60)
-
-        if "chapters" not in self.metadata or not self.metadata["chapters"]:
-            logger.info("No chapters found")
-            return
-
-        chapters = self.metadata["chapters"]
-        logger.info(f"Total Chapters: {len(chapters)}\n")
-
-        for i, chapter in enumerate(chapters, 1):
-            start_time = float(chapter.get("start_time", 0))
-            end_time = float(chapter.get("end_time", 0))
-            duration = end_time - start_time
-
-            logger.info(f"Chapter {i:2d}:")
-            logger.info(f"  Start Time: {self.format_duration(start_time)}")
-            logger.info(f"  End Time: {self.format_duration(end_time)}")
-            logger.info(f"  Duration: {self.format_duration(duration)}")
-
-            # Chapter title
-            title = chapter.get("tags", {}).get("title", f"Chapter {i}")
-            logger.info(f"  Title: {title}")
-            logger.info()
-
-    def test_activation_bytes(self, activation_bytes_list):
-        """Test multiple activation bytes to find the correct one"""
-        logger.info("Testing activation bytes...")
-
-        file_checksum = self.get_file_checksum()
-
-        for i, activation_bytes in enumerate(activation_bytes_list, 1):
-            logger.info(f"Testing #{i}: {activation_bytes}")
-
-            # Calculate AAX checksum
-            aax_checksum = self.calculate_aax_checksum(activation_bytes)
-
-            if aax_checksum:
-                logger.info(f"  AAX Checksum: {aax_checksum}")
-
-                # Try to extract metadata with these activation bytes
-                if self.extract_full_metadata(activation_bytes):
-                    logger.info(f"  ✓ Successfully extracted metadata")
-                    return activation_bytes
-                else:
-                    logger.info(f"  ✗ Failed to extract metadata")
-            else:
-                logger.info(f"  ✗ Failed to calculate checksum")
-
-        return None
-
-    def export_aax_format_json(self, output_file=None, activation_bytes=None):
-        """Export metadata in AAX-like format to JSON"""
-        if not output_file:
-            output_file = self.input_file.stem + "_aax_metadata.json"
-
-        try:
-            export_data = {
-                "File": self.get_file_info(activation_bytes),
-                "Track_Infos": self.get_track_info(),
-                "Chapters": [],
-                "extraction_time": datetime.now().isoformat(),
-            }
-
-            # Add chapter information
-            if "chapters" in self.metadata and self.metadata["chapters"]:
-                for i, chapter in enumerate(self.metadata["chapters"], 1):
-                    start_time = float(chapter.get("start_time", 0))
-                    end_time = float(chapter.get("end_time", 0))
-                    duration = end_time - start_time
-                    title = chapter.get("tags", {}).get("title", f"Chapter {i}")
-
-                    export_data["Chapters"].append(
-                        {
-                            "Chapter": i,
-                            "Title": title,
-                            "Start_Time": self.format_duration(start_time),
-                            "End_Time": self.format_duration(end_time),
-                            "Duration": self.format_duration(duration),
-                        }
-                    )
-
-            with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(export_data, f, indent=2, ensure_ascii=False)
-
-            logger.info(f"\nAAX-format metadata exported to: {output_file}")
-            return True
-        except Exception as e:
-            logger.error(f"Error exporting to JSON: {e}")
-            return False
-
-    def print_all_metadata_aax_format(self, activation_bytes=None):
-        """Print all metadata in AAX format"""
-        logger.info("=" * 60)
-
-        # First, try to extract metadata
-        success = self.extract_full_metadata(activation_bytes)
-
-        # Print file info regardless of metadata extraction success
-        self.print_file_info(activation_bytes)
-
-        if success:
-            self.print_track_info()
-            self.print_chapters_detailed()
-        else:
-            logger.info("\nCould not extract detailed metadata.")
-            if self.input_file.suffix.lower() == ".aax":
-                logger.info("For AAX files, you may need correct activation bytes.")
-
-        return success
-
     def get_album_in_base64_string(self):
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True) as tmp_img:
             try:
@@ -365,13 +265,19 @@ class AudiobookMetadataExtractor:
         chapters = []
         if "chapters" in self.metadata:
             for chapter in self.metadata["chapters"]:
+                start_time = float(chapter.get("start_time", 0))
+                end_time = float(chapter.get("end_time", 0))
+                duration = end_time - start_time
+
                 chapters.append(
                     Chapter(
                         title=chapter.get("tags", {}).get("title"),
-                        start_time=float(chapter.get("start_time", 0)),
-                        end_time=float(chapter.get("end_time", 0)),
+                        start_time=start_time,
+                        end_time=end_time,
                         start_absolute=float(chapter.get("start", 0)),
                         end_absolute=float(chapter.get("end", 0)),
+                        duration=duration,
+                        duration_formatted=self.format_duration(duration),
                     )
                 )
 
@@ -383,6 +289,9 @@ class AudiobookMetadataExtractor:
                 float(self.metadata["format"]["duration"])
             ),
             bitrate=int(self.metadata["format"]["bit_rate"]),
+            bitrate_formatted=self.format_bitrate(
+                int(self.metadata["format"]["bit_rate"])
+            ),
             size=int(self.metadata["format"]["size"]),
             size_formatted=self.format_file_size(int(self.metadata["format"]["size"])),
             chapters=chapters,

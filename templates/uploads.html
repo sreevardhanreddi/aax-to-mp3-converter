@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}AAX Converter - Uploads{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="mb-8">
+    <h2 class="text-2xl font-bold mb-4">Uploaded AAX Files</h2>
+    {% if uploads %}
+    <p class="text-gray-600 dark:text-gray-400">{{ uploads|length }} file(s) found</p>
+    {% else %}
+    <p class="text-gray-600 dark:text-gray-400">No AAX files uploaded yet. <a href="/"
+        class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Upload your first file</a>
+    </p>
+    {% endif %}
+  </div>
+
+  {% if uploads %}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for i in range(uploads|length) %}
+    <div
+      class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 relative">
+      <!-- Action buttons -->
+      <div class="absolute top-4 right-4 flex space-x-2 z-10">
+        <!-- View button -->
+        <button onclick="viewFile('{{ uploads[i] }}')"
+          class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors" title="View details">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        </button>
+        <!-- Delete button -->
+        <button onclick="deleteFile('{{ uploads[i] }}')"
+          class="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors" title="Delete file">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+
+      {% if metadata[i] and metadata[i].album_art %}
+      <div class="mb-4">
+        <img src="data:image/jpeg;base64,{{ metadata[i].album_art }}" alt="Album Art"
+          class="w-full h-48 object-cover rounded-lg" />
+      </div>
+      {% endif %}
+
+      <div class="mb-4">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          {% if metadata[i] and metadata[i].title %}
+          {{ metadata[i].title }}
+          {% else %}
+          {{ uploads[i] }}
+          {% endif %}
+        </h3>
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+          File: {{ uploads[i] }}
+        </div>
+      </div>
+
+      {% if metadata[i] %}
+      <div class="space-y-3">
+        {% if metadata[i].author %}
+        <div>
+          <span class="font-medium text-gray-700 dark:text-gray-300">Author:</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].author }}</span>
+        </div>
+        {% endif %}
+
+        {% if metadata[i].duration_formatted %}
+        <div>
+          <span class="font-medium text-gray-700 dark:text-gray-300">Duration:</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].duration_formatted }}</span>
+        </div>
+        {% endif %}
+
+        {% if metadata[i].size_formatted %}
+        <div>
+          <span class="font-medium text-gray-700 dark:text-gray-300">Size:</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].size_formatted }}</span>
+        </div>
+        {% endif %}
+
+        {% if metadata[i].bitrate %}
+        <div>
+          <span class="font-medium text-gray-700 dark:text-gray-300">Bitrate:</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].bitrate_formatted }}</span>
+        </div>
+        {% endif %}
+
+        {% if metadata[i].chapters %}
+        <div>
+          <span class="font-medium text-gray-700 dark:text-gray-300">Chapters:</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].chapters|length }}</span>
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="text-gray-500 dark:text-gray-400 italic">
+        No metadata available
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  function viewFile(filename) {
+    window.location.href = `/detail/${encodeURIComponent(filename)}`;
+  }
+
+  function deleteFile(filename) {
+    if (confirm(`Are you sure you want to delete "${filename}"?`)) {
+      fetch(`/delete/${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+      })
+        .then(response => {
+          if (response.ok) {
+            location.reload();
+          } else {
+            alert('Failed to delete file');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Failed to delete file');
+        });
+    }
+  }
+</script>
+{% endblock %}

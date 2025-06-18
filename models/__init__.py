@@ -8,6 +8,8 @@ class Chapter(BaseModel):
     end_absolute: Optional[float] = None
     start_time: Optional[float] = None
     end_time: Optional[float] = None
+    duration: Optional[float] = None
+    duration_formatted: Optional[str] = None
 
 
 class AudiobookMetadata(BaseModel):
@@ -16,6 +18,7 @@ class AudiobookMetadata(BaseModel):
     duration: Optional[float] = None
     size: Optional[int] = None
     bitrate: Optional[int] = None
+    bitrate_formatted: Optional[str] = None
     duration_formatted: Optional[str] = None
     size_formatted: Optional[str] = None
 

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ metadata.title or filename }} - Detail{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="mb-6">
+    <a href="/uploads"
+      class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+        stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Uploads
+    </a>
+  </div>
+
+  {% if metadata %}
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- Album Art Section -->
+      {% if metadata.album_art %}
+      <div class="md:col-span-1">
+        <img src="data:image/jpeg;base64,{{ metadata.album_art }}" alt="Album Art"
+          class="w-full rounded-lg shadow-md" />
+      </div>
+      {% endif %}
+
+      <!-- Metadata Section -->
+      <div class="{% if metadata.album_art %}md:col-span-2{% else %}md:col-span-3{% endif %}">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          {{ metadata.title or filename }}
+        </h1>
+
+        <div class="space-y-4">
+          {% if metadata.author %}
+          <div>
+            <span class="text-lg font-semibold text-gray-700 dark:text-gray-300">Author:</span>
+            <span class="text-lg text-gray-900 dark:text-gray-100 ml-2">{{ metadata.author }}</span>
+          </div>
+          {% endif %}
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {% if metadata.duration_formatted %}
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-300">Duration:</span>
+              <span class="text-gray-900 dark:text-gray-100 ml-2">{{ metadata.duration_formatted }}</span>
+            </div>
+            {% endif %}
+
+            {% if metadata.size_formatted %}
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-300">File Size:</span>
+              <span class="text-gray-900 dark:text-gray-100 ml-2">{{ metadata.size_formatted }}</span>
+            </div>
+            {% endif %}
+
+            {% if metadata.bitrate %}
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-300">Bitrate:</span>
+              <span class="text-gray-900 dark:text-gray-100 ml-2">{{ metadata.bitrate_formatted }}</span>
+            </div>
+            {% endif %}
+
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-300">Filename:</span>
+              <span class="text-gray-900 dark:text-gray-100 ml-2 break-all">{{ filename }}</span>
+            </div>
+          </div>
+
+          {% if checksum and activation_bytes %}
+          <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">Authentication Info</h3>
+            <div class="grid grid-cols-1 gap-3">
+              <div>
+                <span class="font-medium text-gray-700 dark:text-gray-300">Checksum:</span>
+                <span class="text-gray-900 dark:text-gray-100 ml-2 font-mono text-sm break-all">{{
+                  checksum }}</span>
+              </div>
+              <div>
+                <span class="font-medium text-gray-700 dark:text-gray-300">Activation Bytes:</span>
+                <span class="text-gray-900 dark:text-gray-100 ml-2 font-mono text-sm break-all">{{
+                  activation_bytes }}</span>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Chapters Section -->
+    {% if metadata.chapters %}
+    <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+      <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+        Chapters ({{ metadata.chapters|length }})
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for chapter in metadata.chapters %}
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            {{ chapter.title or "Chapter " + loop.index|string }}
+          </h3>
+          <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+            {% if chapter.duration_formatted %}
+            <div><strong>Duration:</strong> {{ chapter.duration_formatted }}</div>
+            {% endif %}
+            {% if chapter.start_time is not none and chapter.end_time is not none %}
+            <div><strong>Time Range:</strong> {{ "%.2f"|format(chapter.start_time) }}s - {{
+              "%.2f"|format(chapter.end_time) }}s</div>
+            {% endif %}
+
+            {#
+
+            {% if chapter.start_absolute is not none %}
+            <div><strong>Start Position:</strong> {{ "%.0f"|format(chapter.start_absolute) }}</div>
+            {% endif %}
+            {% if chapter.end_absolute is not none %}
+            <div><strong>End Position:</strong> {{ "%.0f"|format(chapter.end_absolute) }}</div>
+            {% endif %}
+
+            #}
+
+
+
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Raw Metadata Section (Collapsible) -->
+    {% if metadata.raw_metadata %}
+    <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+      <details class="group">
+        <summary class="cursor-pointer text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          Raw Metadata
+          <span class="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
+            (Click to expand)
+          </span>
+        </summary>
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-auto">
+          <pre class="text-sm text-gray-800 dark:text-gray-200">{{ metadata.raw_metadata | tojson(indent=2) }}</pre>
+        </div>
+      </details>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+    <h2 class="text-xl font-bold text-red-800 dark:text-red-200 mb-2">File Not Found</h2>
+    <p class="text-red-600 dark:text-red-300">The requested file could not be found or metadata could not be extracted.
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
