@@ -8,7 +8,7 @@ import mimetypes
 from config import logger
 import base64
 import tempfile
-from models import AudiobookMetadata, Chapter, ActivationBytes
+from models import AudiobookMetadata, Chapter
 
 
 class AudiobookMetadataExtractor:

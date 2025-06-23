@@ -1,10 +1,9 @@
 from fastapi import FastAPI, UploadFile, File, Request
 import os
-from services.extract_metadata import AudiobookMetadataExtractor
-from services.extract_activation_bytes import AAXProcessor
-from models import AudiobookMetadata
+from services import AudiobookMetadataExtractor, AAXProcessor
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
+from config import logger
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -12,13 +11,7 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/")
 def read_root(request: Request):
-    return templates.TemplateResponse(
-        "index.html", {"request": request, "metadata": None}
-    )
-
-
-@app.get("/uploads")
-def read_uploads(request: Request):
+    # Home page now shows uploads list
     uploads = os.listdir("uploads")
     uploads = [f for f in uploads if f.endswith(".aax")]
     # process the file and get the metadata
@@ -32,6 +25,14 @@ def read_uploads(request: Request):
     return templates.TemplateResponse(
         "uploads.html",
         {"request": request, "uploads": uploads, "metadata": metadata},
+    )
+
+
+@app.get("/uploads")
+def read_uploads(request: Request):
+    # Uploads page now shows upload form
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "metadata": None}
     )
 
 
@@ -106,4 +107,4 @@ def upload_file_aax(request: Request, file: UploadFile = File(...)):
     #     # "index.html", {"request": request, "metadata": metadata}
     # )
     # return metadata
-    return RedirectResponse(url="/uploads", status_code=303)
+    return RedirectResponse(url="/", status_code=303)
