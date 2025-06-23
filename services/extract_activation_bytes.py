@@ -3,9 +3,13 @@ import re
 import os
 import json
 import sys
+import zipfile
+import tempfile
 from pathlib import Path
 from config import logger
 import requests
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, TIT2, TPE1, TALB, TCON, APIC, TRCK, TPE2
 
 
 class AAXProcessor:
@@ -221,4 +225,423 @@ class AAXProcessor:
             if not activation_bytes:
                 return {"checksum": checksum, "error": "Could not get activation bytes"}
 
-        return {"checksum": checksum, "activation_bytes": activation_bytes}
+                return {"checksum": checksum, "activation_bytes": activation_bytes}
+
+    def get_duration(self, aax_file):
+        """Get duration of AAX file in seconds using ffprobe."""
+        try:
+            cmd = [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
+                aax_file,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            duration = float(result.stdout.strip())
+            return duration
+        except (subprocess.CalledProcessError, ValueError):
+            logger.error("Could not get duration from AAX file")
+            return None
+
+    def convert_to_m4a(
+        self, aax_file, output_path, activation_bytes, progress_callback=None
+    ):
+        """
+        Convert AAX file to M4A format using ffmpeg with progress tracking.
+
+        Args:
+            aax_file (str): Path to the AAX file
+            output_path (str): Path for the output M4A file
+            activation_bytes (str): Activation bytes for decryption
+            progress_callback (callable): Function to call with progress updates
+
+        Returns:
+            bool: True if conversion successful, False otherwise
+        """
+        try:
+            logger.info(f"Converting {aax_file} to {output_path}")
+
+            # Get total duration for progress calculation
+            total_duration = self.get_duration(aax_file)
+            if not total_duration:
+                logger.warning("Could not get duration, progress will be estimated")
+
+            # FFmpeg command to convert AAX to M4A
+            cmd = [
+                "ffmpeg",
+                "-activation_bytes",
+                activation_bytes,
+                "-i",
+                aax_file,
+                "-c",
+                "copy",
+                "-progress",
+                "pipe:1",  # Output progress to stdout
+                "-y",  # Overwrite output file if it exists
+                output_path,
+            ]
+
+            # Start ffmpeg process
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+            )
+
+            # Monitor progress
+            progress_data = {}
+            while True:
+                output = process.stdout.readline()
+                if output == "" and process.poll() is not None:
+                    break
+
+                if output:
+                    line = output.strip()
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        progress_data[key] = value
+
+                        # Check for time progress
+                        if (
+                            key == "out_time_ms"
+                            and total_duration
+                            and progress_callback
+                        ):
+                            try:
+                                # out_time_ms is in microseconds
+                                current_time = (
+                                    int(value) / 1000000.0
+                                )  # Convert to seconds
+                                progress_percent = min(
+                                    100, (current_time / total_duration) * 100
+                                )
+                                progress_callback(progress_percent)
+                            except (ValueError, ZeroDivisionError):
+                                pass
+
+                        # Alternative progress tracking using 'time' field
+                        elif key == "time" and total_duration and progress_callback:
+                            try:
+                                # Parse time format HH:MM:SS.ss
+                                time_parts = value.split(":")
+                                if len(time_parts) == 3:
+                                    hours = float(time_parts[0])
+                                    minutes = float(time_parts[1])
+                                    seconds = float(time_parts[2])
+                                    current_time = hours * 3600 + minutes * 60 + seconds
+                                    progress_percent = min(
+                                        100, (current_time / total_duration) * 100
+                                    )
+                                    progress_callback(progress_percent)
+                            except (ValueError, IndexError, ZeroDivisionError):
+                                pass
+
+            # Wait for process to complete
+            process.wait()
+
+            if process.returncode == 0:
+                logger.info(f"Successfully converted to {output_path}")
+                if progress_callback:
+                    progress_callback(100)  # Ensure 100% completion
+                return True
+            else:
+                stderr_output = process.stderr.read()
+                logger.error(
+                    f"FFmpeg conversion failed with return code {process.returncode}"
+                )
+                logger.error(f"FFmpeg stderr: {stderr_output}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error converting AAX to M4A: {e}")
+            return False
+
+    def convert_to_mp3_chapters(
+        self, aax_file, output_dir, activation_bytes, progress_callback=None
+    ):
+        """
+        Convert AAX file to multiple MP3 files (one per chapter) with metadata and create a zip file.
+
+        Args:
+            aax_file (str): Path to the AAX file
+            output_dir (str): Directory to store the MP3 files and zip
+            activation_bytes (str): Activation bytes for decryption
+            progress_callback (callable): Function to call with progress updates
+
+        Returns:
+            dict: Result containing success status and zip file path
+        """
+        try:
+            logger.info(f"Converting {aax_file} to MP3 chapters in {output_dir}")
+
+            # First, extract metadata and chapters using ffprobe
+            metadata_cmd = [
+                "ffprobe",
+                "-activation_bytes",
+                activation_bytes,
+                "-i",
+                aax_file,
+                "-print_format",
+                "json",
+                "-show_format",
+                "-show_streams",
+                "-show_chapters",
+                "-v",
+                "quiet",
+            ]
+
+            metadata_result = subprocess.run(
+                metadata_cmd, capture_output=True, text=True, check=True
+            )
+            metadata = json.loads(metadata_result.stdout)
+
+            # Extract general metadata
+            format_info = metadata.get("format", {})
+            tags = format_info.get("tags", {})
+            chapters = metadata.get("chapters", [])
+
+            if not chapters:
+                return {"success": False, "error": "No chapters found in AAX file"}
+
+            # Extract album art using the more reliable method
+            album_art_data = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".jpg", delete=False
+                ) as temp_art:
+                    art_cmd = [
+                        "ffmpeg",
+                        "-y",  # Overwrite output file if exists
+                        "-activation_bytes",
+                        activation_bytes,
+                        "-i",
+                        aax_file,
+                        "-an",  # No audio
+                        "-vcodec",
+                        "copy",
+                        "-map",
+                        "0:v:0",  # Map first video stream (album art)
+                        temp_art.name,
+                    ]
+                    result = subprocess.run(art_cmd, capture_output=True, check=True)
+
+                    # Read the extracted album art
+                    with open(temp_art.name, "rb") as f:
+                        album_art_data = f.read()
+
+                    # Clean up temporary file
+                    os.unlink(temp_art.name)
+                    logger.info(
+                        f"Successfully extracted album art ({len(album_art_data)} bytes)"
+                    )
+
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Primary album art extraction failed: {e}")
+                # Try alternative method without -map parameter
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".jpg", delete=False
+                    ) as temp_art:
+                        alt_art_cmd = [
+                            "ffmpeg",
+                            "-y",
+                            "-activation_bytes",
+                            activation_bytes,
+                            "-i",
+                            aax_file,
+                            "-an",
+                            "-vcodec",
+                            "copy",
+                            temp_art.name,
+                        ]
+                        subprocess.run(alt_art_cmd, capture_output=True, check=True)
+
+                        with open(temp_art.name, "rb") as f:
+                            album_art_data = f.read()
+
+                        os.unlink(temp_art.name)
+                        logger.info(
+                            f"Successfully extracted album art with alternative method ({len(album_art_data)} bytes)"
+                        )
+
+                except Exception as alt_e:
+                    logger.warning(
+                        f"Alternative album art extraction also failed: {alt_e}"
+                    )
+                    album_art_data = None
+
+            except Exception as e:
+                logger.error(f"Error extracting album art: {e}")
+                album_art_data = None
+
+            # Create temporary directory for MP3 files
+            temp_dir = tempfile.mkdtemp()
+            mp3_files = []
+
+            total_chapters = len(chapters)
+
+            for i, chapter in enumerate(chapters):
+                chapter_start = float(chapter.get("start_time", 0))
+                chapter_end = float(chapter.get("end_time", 0))
+                duration = chapter_end - chapter_start
+
+                # Get chapter title
+                chapter_tags = chapter.get("tags", {})
+                chapter_title = (
+                    chapter_tags.get("title")
+                    or chapter_tags.get("Title")
+                    or f"Chapter {i + 1:02d}"
+                )
+
+                # Clean filename
+                safe_title = "".join(
+                    c for c in chapter_title if c.isalnum() or c in (" ", "-", "_")
+                ).rstrip()
+                mp3_filename = f"{i + 1:02d} - {safe_title}.mp3"
+                mp3_path = os.path.join(temp_dir, mp3_filename)
+
+                # Convert chapter to MP3
+                chapter_cmd = [
+                    "ffmpeg",
+                    "-activation_bytes",
+                    activation_bytes,
+                    "-i",
+                    aax_file,
+                    "-ss",
+                    str(chapter_start),
+                    "-t",
+                    str(duration),
+                    "-acodec",
+                    "libmp3lame",
+                    "-ab",
+                    "128k",
+                    "-ar",
+                    "44100",
+                    "-y",
+                    mp3_path,
+                ]
+
+                subprocess.run(chapter_cmd, capture_output=True, check=True)
+
+                # Add metadata to MP3 file
+                if os.path.exists(mp3_path):
+                    try:
+                        audio = MP3(mp3_path, ID3=ID3)
+
+                        # Add ID3 tag if not present
+                        if audio.tags is None:
+                            audio.add_tags()
+
+                        # Clear any existing tags to start fresh
+                        audio.tags.clear()
+
+                        # Add metadata
+                        audio.tags.add(TIT2(encoding=3, text=chapter_title))
+
+                        # Author/Artist
+                        author = (
+                            tags.get("artist")
+                            or tags.get("narrator")
+                            or tags.get("ARTIST")
+                            or "Unknown Author"
+                        )
+                        audio.tags.add(TPE1(encoding=3, text=author))
+                        audio.tags.add(TPE2(encoding=3, text=author))  # Album artist
+
+                        # Album/Book title
+                        album = (
+                            tags.get("title") or tags.get("TITLE") or "Unknown Album"
+                        )
+                        audio.tags.add(TALB(encoding=3, text=album))
+
+                        # Genre
+                        genre = tags.get("genre") or tags.get("GENRE") or "Audiobook"
+                        audio.tags.add(TCON(encoding=3, text=genre))
+
+                        # Track number
+                        audio.tags.add(
+                            TRCK(encoding=3, text=f"{i + 1}/{total_chapters}")
+                        )
+
+                        # Add album art if available
+                        if album_art_data:
+                            try:
+                                audio.tags.add(
+                                    APIC(
+                                        encoding=3,
+                                        mime="image/jpeg",
+                                        type=3,  # Cover (front)
+                                        desc="Cover",
+                                        data=album_art_data,
+                                    )
+                                )
+                                logger.info(
+                                    f"Added album art to {chapter_title} ({len(album_art_data)} bytes)"
+                                )
+                            except Exception as art_error:
+                                logger.error(
+                                    f"Error adding album art to {mp3_path}: {art_error}"
+                                )
+                        else:
+                            logger.warning(
+                                f"No album art data available for {chapter_title}"
+                            )
+
+                        # Save all changes
+                        audio.save(v2_version=3)  # Use ID3v2.3 for better compatibility
+                        logger.info(f"Successfully processed chapter: {chapter_title}")
+                        mp3_files.append(mp3_path)
+
+                    except Exception as e:
+                        logger.error(f"Error adding metadata to {mp3_path}: {e}")
+                        # Still add to list even if metadata fails
+                        mp3_files.append(mp3_path)
+
+                # Update progress
+                if progress_callback:
+                    progress = (
+                        (i + 1) / total_chapters
+                    ) * 90  # Reserve 10% for zipping
+                    progress_callback(progress)
+
+            # Create zip file
+            base_name = os.path.splitext(os.path.basename(aax_file))[0]
+            zip_filename = f"{base_name}_chapters.zip"
+            zip_path = os.path.join(output_dir, zip_filename)
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+                for mp3_file in mp3_files:
+                    if os.path.exists(mp3_file):
+                        arcname = os.path.basename(mp3_file)
+                        zipf.write(mp3_file, arcname)
+
+            # Cleanup temporary files
+            for mp3_file in mp3_files:
+                if os.path.exists(mp3_file):
+                    os.remove(mp3_file)
+            os.rmdir(temp_dir)
+
+            if progress_callback:
+                progress_callback(100)
+
+            logger.info(f"Successfully created MP3 chapters zip: {zip_path}")
+            return {
+                "success": True,
+                "zip_path": zip_path,
+                "zip_filename": zip_filename,
+                "chapter_count": len(mp3_files),
+            }
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"FFmpeg error during MP3 conversion: {e}")
+            return {"success": False, "error": f"FFmpeg error: {e}"}
+        except Exception as e:
+            logger.error(f"Error converting AAX to MP3 chapters: {e}")
+            return {"success": False, "error": str(e)}

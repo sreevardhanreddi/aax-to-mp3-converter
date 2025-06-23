@@ -177,3 +177,4 @@ redis_data/
 uploads/
 audible_rainbow_tables/
 activation_bytes.json
+sqlite.db

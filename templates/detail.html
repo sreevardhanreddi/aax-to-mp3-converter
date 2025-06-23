@@ -3,13 +3,12 @@
 {% block content %}
 <div class="max-w-4xl mx-auto">
   <div class="mb-6">
-    <a href="/uploads"
-      class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center">
+    <a href="/" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
         stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
-      Back to Uploads
+      Back to Home
     </a>
   </div>
 
@@ -79,6 +78,80 @@
                 <span class="font-medium text-gray-700 dark:text-gray-300">Activation Bytes:</span>
                 <span class="text-gray-900 dark:text-gray-100 ml-2 font-mono text-sm break-all">{{
                   activation_bytes }}</span>
+              </div>
+            </div>
+
+            <!-- Download Section -->
+            <div class="mt-4" id="download-section">
+              <!-- Conversion Options -->
+              <div class="space-y-3">
+                <!-- M4A Convert Button -->
+                <button id="convert-btn" onclick="startConversion('{{ filename }}')"
+                  class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span id="convert-btn-text">Convert to M4A</span>
+                </button>
+
+                <!-- MP3 Chapters Convert Button -->
+                <button id="convert-mp3-btn" onclick="startMp3Conversion('{{ filename }}')"
+                  class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span id="convert-mp3-btn-text">Convert to MP3 Chapters (ZIP)</span>
+                </button>
+              </div>
+
+              <!-- Progress Section -->
+              <div id="progress-section" class="mt-4 hidden">
+                <div class="flex items-center space-x-3">
+                  <div class="flex-1">
+                    <div class="flex justify-between text-sm mb-1">
+                      <span id="progress-text">Converting...</span>
+                      <span id="progress-percentage">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div id="progress-bar" class="bg-green-600 h-2 rounded-full transition-all duration-300"
+                        style="width: 0%"></div>
+                    </div>
+                  </div>
+                  <div id="spinner" class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                </div>
+              </div>
+
+              <!-- Download Buttons (appear after conversion) -->
+              <div id="download-buttons" class="mt-4 space-y-2 hidden">
+                <button id="download-btn" onclick="downloadFile('{{ filename }}')"
+                  class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-md hidden">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download M4A File
+                </button>
+
+                <button id="download-mp3-btn" onclick="downloadMp3File('{{ filename }}')"
+                  class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md hidden">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download MP3 Chapters ZIP
+                </button>
+              </div>
+
+              <div id="conversion-info" class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                <p><strong>M4A:</strong> Single file format preserving the audiobook structure.</p>
+                <p><strong>MP3 Chapters:</strong> Each chapter as a separate MP3 file with metadata and album art,
+                  packaged in a ZIP file.</p>
               </div>
             </div>
           </div>
@@ -153,4 +226,248 @@
   </div>
   {% endif %}
 </div>
+
+<script>
+  let progressInterval;
+  let currentConversionType = 'm4a';
+
+  async function startConversion(filename) {
+    currentConversionType = 'm4a';
+    const convertBtn = document.getElementById('convert-btn');
+    const convertMp3Btn = document.getElementById('convert-mp3-btn');
+    const progressSection = document.getElementById('progress-section');
+    const downloadButtons = document.getElementById('download-buttons');
+
+    // Disable both convert buttons and show progress
+    convertBtn.disabled = true;
+    convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    convertMp3Btn.disabled = true;
+    convertMp3Btn.classList.add('opacity-50', 'cursor-not-allowed');
+    progressSection.classList.remove('hidden');
+    downloadButtons.classList.add('hidden');
+
+    try {
+      // Start conversion
+      const response = await fetch(`/convert/${encodeURIComponent(filename)}`, {
+        method: 'POST'
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'already_converted') {
+        // File already converted, show download button and auto-download
+        showDownloadButton(filename);
+        downloadFile(filename);
+        return;
+      } else if (result.status === 'started' || result.status === 'in_progress') {
+        // Start polling for progress more frequently for smoother updates
+        progressInterval = setInterval(() => checkProgress(filename, currentConversionType), 1000);
+      } else {
+        throw new Error(result.message || 'Failed to start conversion');
+      }
+
+    } catch (error) {
+      console.error('Error starting conversion:', error);
+      showError('Failed to start conversion: ' + error.message);
+      resetInterface();
+    }
+  }
+
+  async function checkProgress(filename, conversionType = 'm4a') {
+    try {
+      const response = await fetch(`/convert/status/${encodeURIComponent(filename)}?conversion_type=${conversionType}`);
+      const progress = await response.json();
+
+      updateProgress(progress);
+
+      if (progress.status === 'completed') {
+        clearInterval(progressInterval);
+        showDownloadButton(filename, conversionType);
+        // Auto-download after a brief delay
+        setTimeout(() => {
+          if (conversionType === 'm4a') {
+            downloadFile(filename);
+          } else if (conversionType === 'mp3_chapters') {
+            downloadMp3File(filename);
+          }
+        }, 500);
+      } else if (progress.status === 'error') {
+        clearInterval(progressInterval);
+        showError('Conversion failed: ' + (progress.error || 'Unknown error'));
+        resetInterface();
+      }
+
+    } catch (error) {
+      console.error('Error checking progress:', error);
+      clearInterval(progressInterval);
+      showError('Error checking progress: ' + error.message);
+      resetInterface();
+    }
+  }
+
+  function updateProgress(progress) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressPercentage = document.getElementById('progress-percentage');
+
+    progressBar.style.width = progress.progress + '%';
+    progressPercentage.textContent = progress.progress + '%';
+
+    switch (progress.status) {
+      case 'starting':
+        progressText.textContent = 'Initializing conversion...';
+        break;
+      case 'converting':
+        if (currentConversionType === 'mp3_chapters') {
+          progressText.textContent = 'Converting to MP3 chapters...';
+        } else {
+          progressText.textContent = 'Converting to M4A...';
+        }
+        break;
+      case 'completed':
+        progressText.textContent = 'Conversion completed!';
+        break;
+      default:
+        progressText.textContent = 'Processing...';
+    }
+  }
+
+  function showDownloadButton(filename, conversionType = 'm4a') {
+    const progressSection = document.getElementById('progress-section');
+    const downloadButtons = document.getElementById('download-buttons');
+    const downloadBtn = document.getElementById('download-btn');
+    const downloadMp3Btn = document.getElementById('download-mp3-btn');
+    const spinner = document.getElementById('spinner');
+
+    // Hide spinner and show appropriate download button
+    spinner.classList.add('hidden');
+    downloadButtons.classList.remove('hidden');
+
+    if (conversionType === 'm4a') {
+      downloadBtn.classList.remove('hidden');
+      downloadMp3Btn.classList.add('hidden');
+    } else if (conversionType === 'mp3_chapters') {
+      downloadMp3Btn.classList.remove('hidden');
+      downloadBtn.classList.add('hidden');
+    }
+
+    // Update progress to show completion
+    updateProgress({ status: 'completed', progress: 100 });
+  }
+
+  function downloadFile(filename) {
+    // Create a temporary link to trigger download
+    const link = document.createElement('a');
+    link.href = `/download/${encodeURIComponent(filename)}`;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Reset interface after download starts
+    setTimeout(resetInterface, 1000);
+  }
+
+  function resetInterface() {
+    const convertBtn = document.getElementById('convert-btn');
+    const convertMp3Btn = document.getElementById('convert-mp3-btn');
+    const progressSection = document.getElementById('progress-section');
+    const downloadButtons = document.getElementById('download-buttons');
+
+    // Re-enable both convert buttons
+    convertBtn.disabled = false;
+    convertBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    convertMp3Btn.disabled = false;
+    convertMp3Btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+    // Hide progress and download sections
+    progressSection.classList.add('hidden');
+    downloadButtons.classList.add('hidden');
+
+    // Show spinner again for next time
+    document.getElementById('spinner').classList.remove('hidden');
+
+    // Clear any intervals
+    if (progressInterval) {
+      clearInterval(progressInterval);
+    }
+  }
+
+  function showError(message) {
+    // Create error notification
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg';
+    errorDiv.innerHTML = `
+    <div class="flex">
+      <svg class="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+      </svg>
+      <div class="ml-3">
+        <p class="text-sm text-red-800 dark:text-red-200">${message}</p>
+      </div>
+    </div>
+  `;
+
+    const downloadSection = document.getElementById('download-section');
+    downloadSection.appendChild(errorDiv);
+
+    // Remove error after 5 seconds
+    setTimeout(() => {
+      if (errorDiv.parentNode) {
+        errorDiv.parentNode.removeChild(errorDiv);
+      }
+    }, 5000);
+  }
+
+  // MP3 Conversion Functions
+  async function startMp3Conversion(filename) {
+    currentConversionType = 'mp3_chapters';
+    const convertBtn = document.getElementById('convert-btn');
+    const convertMp3Btn = document.getElementById('convert-mp3-btn');
+    const progressSection = document.getElementById('progress-section');
+    const downloadButtons = document.getElementById('download-buttons');
+
+    // Disable both convert buttons and show progress
+    convertBtn.disabled = true;
+    convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    convertMp3Btn.disabled = true;
+    convertMp3Btn.classList.add('opacity-50', 'cursor-not-allowed');
+    progressSection.classList.remove('hidden');
+    downloadButtons.classList.add('hidden');
+
+    try {
+      // Start MP3 conversion
+      const response = await fetch(`/convert/mp3/${encodeURIComponent(filename)}`, {
+        method: 'POST'
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'started' || result.status === 'in_progress') {
+        // Start polling for progress
+        progressInterval = setInterval(() => checkProgress(filename, currentConversionType), 1000);
+      } else {
+        throw new Error(result.message || 'Failed to start MP3 conversion');
+      }
+
+    } catch (error) {
+      console.error('Error starting MP3 conversion:', error);
+      showError('Failed to start MP3 conversion: ' + error.message);
+      resetInterface();
+    }
+  }
+
+  function downloadMp3File(filename) {
+    // Create a temporary link to trigger download
+    const link = document.createElement('a');
+    link.href = `/download/mp3/${encodeURIComponent(filename)}`;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Reset interface after download starts
+    setTimeout(resetInterface, 1000);
+  }
+</script>
 {% endblock %}
