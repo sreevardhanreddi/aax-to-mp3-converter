@@ -104,7 +104,18 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <span id="convert-mp3-btn-text">Convert to MP3 Chapters (ZIP)</span>
+                  <span id="convert-mp3-btn-text">Convert to MP3 Chapters (Sequential)</span>
+                </button>
+
+                <!-- MP3 Chapters Parallel Convert Button -->
+                <button id="convert-mp3-parallel-btn" onclick="startMp3ConversionParallel('{{ filename }}')"
+                  class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-md">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span id="convert-mp3-parallel-btn-text">Convert to MP3 Chapters (Parallel ⚡)</span>
                 </button>
               </div>
 
@@ -150,8 +161,10 @@
 
               <div id="conversion-info" class="text-sm text-gray-500 dark:text-gray-400 mt-2">
                 <p><strong>M4A:</strong> Single file format preserving the audiobook structure.</p>
-                <p><strong>MP3 Chapters:</strong> Each chapter as a separate MP3 file with metadata and album art,
-                  packaged in a ZIP file.</p>
+                <p><strong>MP3 Chapters (Sequential):</strong> Each chapter as a separate MP3 file with metadata and
+                  album art, processed one at a time.</p>
+                <p><strong>MP3 Chapters (Parallel ⚡):</strong> Same as sequential but processes multiple chapters
+                  simultaneously for faster conversion (up to 4x faster).</p>
               </div>
             </div>
           </div>
@@ -235,14 +248,17 @@
     currentConversionType = 'm4a';
     const convertBtn = document.getElementById('convert-btn');
     const convertMp3Btn = document.getElementById('convert-mp3-btn');
+    const convertMp3ParallelBtn = document.getElementById('convert-mp3-parallel-btn');
     const progressSection = document.getElementById('progress-section');
     const downloadButtons = document.getElementById('download-buttons');
 
-    // Disable both convert buttons and show progress
+    // Disable all convert buttons and show progress
     convertBtn.disabled = true;
     convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
     convertMp3Btn.disabled = true;
     convertMp3Btn.classList.add('opacity-50', 'cursor-not-allowed');
+    convertMp3ParallelBtn.disabled = true;
+    convertMp3ParallelBtn.classList.add('opacity-50', 'cursor-not-allowed');
     progressSection.classList.remove('hidden');
     downloadButtons.classList.add('hidden');
 
@@ -371,14 +387,17 @@
   function resetInterface() {
     const convertBtn = document.getElementById('convert-btn');
     const convertMp3Btn = document.getElementById('convert-mp3-btn');
+    const convertMp3ParallelBtn = document.getElementById('convert-mp3-parallel-btn');
     const progressSection = document.getElementById('progress-section');
     const downloadButtons = document.getElementById('download-buttons');
 
-    // Re-enable both convert buttons
+    // Re-enable all convert buttons
     convertBtn.disabled = false;
     convertBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     convertMp3Btn.disabled = false;
     convertMp3Btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    convertMp3ParallelBtn.disabled = false;
+    convertMp3ParallelBtn.classList.remove('opacity-50', 'cursor-not-allowed');
 
     // Hide progress and download sections
     progressSection.classList.add('hidden');
@@ -424,19 +443,22 @@
     currentConversionType = 'mp3_chapters';
     const convertBtn = document.getElementById('convert-btn');
     const convertMp3Btn = document.getElementById('convert-mp3-btn');
+    const convertMp3ParallelBtn = document.getElementById('convert-mp3-parallel-btn');
     const progressSection = document.getElementById('progress-section');
     const downloadButtons = document.getElementById('download-buttons');
 
-    // Disable both convert buttons and show progress
+    // Disable all convert buttons and show progress
     convertBtn.disabled = true;
     convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
     convertMp3Btn.disabled = true;
     convertMp3Btn.classList.add('opacity-50', 'cursor-not-allowed');
+    convertMp3ParallelBtn.disabled = true;
+    convertMp3ParallelBtn.classList.add('opacity-50', 'cursor-not-allowed');
     progressSection.classList.remove('hidden');
     downloadButtons.classList.add('hidden');
 
     try {
-      // Start MP3 conversion
+      // Start MP3 conversion (sequential)
       const response = await fetch(`/convert/mp3/${encodeURIComponent(filename)}`, {
         method: 'POST'
       });
@@ -453,6 +475,50 @@
     } catch (error) {
       console.error('Error starting MP3 conversion:', error);
       showError('Failed to start MP3 conversion: ' + error.message);
+      resetInterface();
+    }
+  }
+
+  async function startMp3ConversionParallel(filename) {
+    currentConversionType = 'mp3_chapters';
+    const convertBtn = document.getElementById('convert-btn');
+    const convertMp3Btn = document.getElementById('convert-mp3-btn');
+    const convertMp3ParallelBtn = document.getElementById('convert-mp3-parallel-btn');
+    const progressSection = document.getElementById('progress-section');
+    const downloadButtons = document.getElementById('download-buttons');
+
+    // Disable all convert buttons and show progress
+    convertBtn.disabled = true;
+    convertBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    convertMp3Btn.disabled = true;
+    convertMp3Btn.classList.add('opacity-50', 'cursor-not-allowed');
+    convertMp3ParallelBtn.disabled = true;
+    convertMp3ParallelBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    progressSection.classList.remove('hidden');
+    downloadButtons.classList.add('hidden');
+
+    try {
+      // Start MP3 conversion (parallel)
+      const response = await fetch(`/convert/mp3/parallel/${encodeURIComponent(filename)}`, {
+        method: 'POST'
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'started' || result.status === 'in_progress') {
+        // Update progress text to show parallel mode
+        const progressText = document.getElementById('progress-text');
+        progressText.textContent = `Converting chapters in parallel (${result.max_workers || 4} workers)...`;
+
+        // Start polling for progress
+        progressInterval = setInterval(() => checkProgress(filename, currentConversionType), 1000);
+      } else {
+        throw new Error(result.message || 'Failed to start parallel MP3 conversion');
+      }
+
+    } catch (error) {
+      console.error('Error starting parallel MP3 conversion:', error);
+      showError('Failed to start parallel MP3 conversion: ' + error.message);
       resetInterface();
     }
   }

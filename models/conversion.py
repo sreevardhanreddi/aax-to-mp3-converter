@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, create_engine, Session, select, Field
+from sqlmodel import SQLModel, create_engine, Session, select, Field, UniqueConstraint
 from typing import Optional, List
 from datetime import datetime
 from config import logger
@@ -9,9 +9,12 @@ class Conversion(SQLModel, table=True):
     """SQLModel table for tracking conversion progress"""
 
     __tablename__ = "conversions"
+    __table_args__ = (
+        UniqueConstraint("filename", "conversion_type", name="unique_filename_type"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    filename: str = Field(unique=True, index=True)
+    filename: str = Field(index=True)
     conversion_type: str = Field(default="m4a", index=True)  # "m4a" or "mp3_chapters"
     status: str = Field(index=True)
     progress: float = Field(default=0.0)
@@ -30,8 +33,16 @@ class ConversionTracker:
 
     def init_database(self):
         """Initialize the database with required tables"""
-        SQLModel.metadata.create_all(self.engine)
-        logger.info("Database initialized successfully")
+        # Check if the table already exists with the correct schema
+        try:
+            with Session(self.engine) as session:
+                # Try to query the table to see if it exists
+                session.exec(select(Conversion).limit(1))
+                logger.info("Database table already exists, skipping creation")
+        except Exception:
+            # Table doesn't exist or has wrong schema, create it
+            SQLModel.metadata.create_all(self.engine)
+            logger.info("Database initialized successfully")
 
     def start_conversion(self, filename: str, conversion_type: str = "m4a"):
         """Mark conversion as started"""
@@ -202,3 +213,32 @@ class ConversionTracker:
                 }
                 for conversion in active_conversions
             ]
+
+    def reset_stuck_conversions(self):
+        """Reset conversions that were interrupted during server shutdown"""
+        from datetime import timedelta
+
+        # Find conversions that have been 'starting' or 'converting' for too long
+        stale_threshold = datetime.utcnow() - timedelta(minutes=5)
+
+        with self.lock:
+            with Session(self.engine) as session:
+                stuck_conversions = session.exec(
+                    select(Conversion).where(
+                        Conversion.status.in_(["starting", "converting"]),
+                        Conversion.updated_at < stale_threshold,
+                    )
+                ).all()
+
+                reset_count = 0
+                for conversion in stuck_conversions:
+                    conversion.status = "error"
+                    conversion.error_message = (
+                        "Conversion interrupted - server restarted"
+                    )
+                    conversion.updated_at = datetime.utcnow()
+                    reset_count += 1
+
+                session.commit()
+                if reset_count > 0:
+                    logger.info(f"Reset {reset_count} stuck conversions")

@@ -1,11 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, Request, HTTPException
 import os
 import json
-import threading
 import time
 from contextlib import asynccontextmanager
-from services import AudiobookMetadataExtractor, AAXProcessor
-from models import ConversionTracker
+from typing import Optional
+from services import (
+    AudiobookMetadataExtractor,
+    AAXProcessor,
+    conversion_orchestrator,
+)
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from config import logger
@@ -15,21 +18,15 @@ from config import logger
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up AAX Converter...")
-    # Initialize SQLite-based conversion tracker
-    global conversion_tracker
-    conversion_tracker = ConversionTracker()
-    # Clean up old conversion records on startup
-    conversion_tracker.cleanup_old_records(days=2)
+    # Services are initialized automatically via their singletons
     yield
     # Shutdown
     logger.info("Shutting down AAX Converter...")
+    # Thread manager handles graceful shutdown automatically
 
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
-
-# Global conversion tracker instance
-conversion_tracker = None
 
 
 @app.get("/")
@@ -112,102 +109,6 @@ def delete_file(filename: str):
         return {"error": str(e)}, 500
 
 
-def convert_file_background(
-    filename: str, aax_file_path: str, m4a_file_path: str, activation_bytes: str
-):
-    """Background function to handle file conversion with progress tracking"""
-    try:
-        if os.path.exists(m4a_file_path):
-            os.remove(m4a_file_path)
-        # Start conversion tracking in database
-        conversion_tracker.start_conversion(filename, "m4a")
-
-        processor = AAXProcessor()
-
-        # Define progress callback function
-        def progress_callback(progress_percent):
-            conversion_tracker.update_progress(
-                filename, round(progress_percent, 1), "converting", "m4a"
-            )
-            logger.info(f"Conversion progress for {filename}: {progress_percent:.1f}%")
-
-        # Update status to converting
-        conversion_tracker.update_progress(filename, 0, "converting", "m4a")
-
-        success = processor.convert_to_m4a(
-            aax_file_path, m4a_file_path, activation_bytes, progress_callback
-        )
-
-        # Mark conversion as completed or failed
-        if success:
-            conversion_tracker.complete_conversion(
-                filename, success=True, result_path=m4a_file_path, conversion_type="m4a"
-            )
-        else:
-            conversion_tracker.complete_conversion(
-                filename,
-                success=False,
-                error_message="Conversion failed",
-                conversion_type="m4a",
-            )
-
-    except Exception as e:
-        conversion_tracker.complete_conversion(
-            filename, success=False, error_message=str(e), conversion_type="m4a"
-        )
-
-
-def convert_mp3_chapters_background(
-    filename: str, aax_file_path: str, output_dir: str, activation_bytes: str
-):
-    """Background function to handle MP3 chapter conversion with progress tracking"""
-    try:
-        # Start conversion tracking in database
-        conversion_tracker.start_conversion(filename, "mp3_chapters")
-
-        processor = AAXProcessor()
-
-        # Define progress callback function
-        def progress_callback(progress_percent):
-            conversion_tracker.update_progress(
-                filename, round(progress_percent, 1), "converting", "mp3_chapters"
-            )
-            logger.info(
-                f"MP3 chapters conversion progress for {filename}: {progress_percent:.1f}%"
-            )
-
-        # Update status to converting
-        conversion_tracker.update_progress(filename, 0, "converting", "mp3_chapters")
-
-        result = processor.convert_to_mp3_chapters(
-            aax_file_path, output_dir, activation_bytes, progress_callback
-        )
-
-        # Mark conversion as completed or failed
-        if result["success"]:
-            conversion_tracker.complete_conversion(
-                filename,
-                success=True,
-                result_path=result["zip_path"],
-                conversion_type="mp3_chapters",
-            )
-        else:
-            conversion_tracker.complete_conversion(
-                filename,
-                success=False,
-                error_message=result.get("error", "MP3 conversion failed"),
-                conversion_type="mp3_chapters",
-            )
-
-    except Exception as e:
-        conversion_tracker.complete_conversion(
-            filename,
-            success=False,
-            error_message=str(e),
-            conversion_type="mp3_chapters",
-        )
-
-
 @app.post("/convert/{filename}")
 def start_conversion(filename: str):
     """Start AAX to M4A conversion in background"""
@@ -237,12 +138,6 @@ def start_conversion(filename: str):
                 }
             )
 
-        # Check if conversion is already in progress
-        if conversion_tracker.is_conversion_active(filename, "m4a"):
-            return JSONResponse(
-                {"status": "in_progress", "message": "Conversion already in progress"}
-            )
-
         # Get activation bytes
         processor = AAXProcessor()
         result = processor.get_activation_bytes(aax_file_path)
@@ -255,15 +150,15 @@ def start_conversion(filename: str):
 
         activation_bytes = result["activation_bytes"]
 
-        # Start conversion in background thread
-        thread = threading.Thread(
-            target=convert_file_background,
-            args=(filename, aax_file_path, m4a_file_path, activation_bytes),
-        )
-        thread.daemon = True
-        thread.start()
-
-        return JSONResponse({"status": "started", "message": "Conversion started"})
+        # Start conversion using orchestrator
+        if conversion_orchestrator.start_m4a_conversion(
+            filename, aax_file_path, m4a_file_path, activation_bytes
+        ):
+            return JSONResponse({"status": "started", "message": "Conversion started"})
+        else:
+            return JSONResponse(
+                {"status": "in_progress", "message": "Conversion already in progress"}
+            )
 
     except Exception as e:
         logger.error(f"Error starting conversion: {str(e)}")
@@ -273,25 +168,16 @@ def start_conversion(filename: str):
 @app.get("/convert/status/{filename}")
 def get_conversion_status(filename: str, conversion_type: str = "m4a"):
     """Get conversion progress status"""
-    progress_data = conversion_tracker.get_progress(filename, conversion_type)
-
-    # If completed, add download URL
-    if progress_data["status"] == "completed":
-        if conversion_type == "m4a":
-            progress_data["download_url"] = f"/download/{filename}"
-        elif conversion_type == "mp3_chapters":
-            progress_data["download_url"] = f"/download/mp3/{filename}"
-
+    progress_data = conversion_orchestrator.get_conversion_status(
+        filename, conversion_type
+    )
     return JSONResponse(progress_data)
 
 
 @app.get("/convert/active")
 def get_active_conversions():
     """Get all currently active conversions for monitoring"""
-    active_conversions = conversion_tracker.get_all_active_conversions()
-    return JSONResponse(
-        {"active_conversions": active_conversions, "count": len(active_conversions)}
-    )
+    return JSONResponse(conversion_orchestrator.get_active_conversions())
 
 
 @app.get("/download/{filename}")
@@ -353,14 +239,55 @@ def start_mp3_conversion(filename: str):
         # Create output directory for zip file
         output_dir = "uploads"
 
-        # Check if conversion is already in progress
-        if conversion_tracker.is_conversion_active(filename, "mp3_chapters"):
+        # Get activation bytes
+        processor = AAXProcessor()
+        result = processor.get_activation_bytes(aax_file_path)
+
+        if "error" in result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Could not get activation bytes: {result['error']}",
+            )
+
+        activation_bytes = result["activation_bytes"]
+
+        # Start conversion using orchestrator (sequential by default)
+        if conversion_orchestrator.start_mp3_conversion(
+            filename, aax_file_path, output_dir, activation_bytes, parallel=False
+        ):
+            return JSONResponse(
+                {
+                    "status": "started",
+                    "message": "MP3 chapters conversion started (sequential)",
+                }
+            )
+        else:
             return JSONResponse(
                 {
                     "status": "in_progress",
                     "message": "MP3 conversion already in progress",
                 }
             )
+
+    except Exception as e:
+        logger.error(f"Error starting MP3 conversion: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/convert/mp3/parallel/{filename}")
+def start_mp3_conversion_parallel(filename: str, max_workers: Optional[int] = None):
+    """Start AAX to MP3 chapters conversion in background with parallel processing"""
+    try:
+        # Validate filename
+        if not filename.endswith(".aax"):
+            raise HTTPException(status_code=400, detail="Invalid file format")
+
+        aax_file_path = os.path.join("uploads", filename)
+        if not os.path.exists(aax_file_path):
+            raise HTTPException(status_code=404, detail="AAX file not found")
+
+        # Create output directory for zip file
+        output_dir = "uploads"
 
         # Get activation bytes
         processor = AAXProcessor()
@@ -374,20 +301,32 @@ def start_mp3_conversion(filename: str):
 
         activation_bytes = result["activation_bytes"]
 
-        # Start conversion in background thread
-        thread = threading.Thread(
-            target=convert_mp3_chapters_background,
-            args=(filename, aax_file_path, output_dir, activation_bytes),
-        )
-        thread.daemon = True
-        thread.start()
+        # Start parallel conversion using orchestrator
+        if conversion_orchestrator.start_mp3_conversion(
+            filename, aax_file_path, output_dir, activation_bytes, parallel=True
+        ):
+            # Determine worker count for user feedback
+            if max_workers is None:
+                max_workers = min(os.cpu_count() or 4, 4)
 
-        return JSONResponse(
-            {"status": "started", "message": "MP3 chapters conversion started"}
-        )
+            return JSONResponse(
+                {
+                    "status": "started",
+                    "message": f"MP3 chapters conversion started (parallel with {max_workers} workers)",
+                    "parallel": True,
+                    "max_workers": max_workers,
+                }
+            )
+        else:
+            return JSONResponse(
+                {
+                    "status": "in_progress",
+                    "message": "MP3 conversion already in progress",
+                }
+            )
 
     except Exception as e:
-        logger.error(f"Error starting MP3 conversion: {str(e)}")
+        logger.error(f"Error starting parallel MP3 conversion: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -399,7 +338,9 @@ def download_mp3_zip(filename: str):
             raise HTTPException(status_code=400, detail="Invalid file format")
 
         # Get the conversion record to find the zip file path
-        progress_data = conversion_tracker.get_progress(filename, "mp3_chapters")
+        progress_data = conversion_orchestrator.get_conversion_status(
+            filename, "mp3_chapters"
+        )
 
         if progress_data["status"] != "completed" or not progress_data.get(
             "result_path"
