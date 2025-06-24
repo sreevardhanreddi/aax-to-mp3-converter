@@ -42,12 +42,8 @@ docker-compose -f docker-compose.dev.yml up --build
 2. **View Collection**: Browse uploaded files in the uploads section
 3. **Extract Details**: Click on any file to view detailed metadata and activation bytes
 4. **File Management**: Delete files directly from the web interface
+5. **Convert to M4A**: Convert the AAX file to an M4A file
+6. **Convert to MP3 Chapters**: Convert the AAX file to MP3 chapters
 
-## File Structure
-
-- `/services/`: Core processing modules for metadata and activation byte extraction
-- `/models/`: Data models for audiobook metadata
-- `/templates/`: Responsive HTML templates with dark mode support
-- `/uploads/`: Storage directory for uploaded AAX files
-
-Perfect for audiobook enthusiasts who need to manage and convert their Audible collection efficiently.
+![home page](./docs/home.png)
+![detail page](./docs/detail.png)
