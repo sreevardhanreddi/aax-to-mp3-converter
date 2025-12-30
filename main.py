@@ -1,17 +1,15 @@
-from fastapi import FastAPI, UploadFile, File, Request, HTTPException
-import os
 import json
+import os
 import time
 from contextlib import asynccontextmanager
 from typing import Optional
-from services import (
-    AudiobookMetadataExtractor,
-    AAXProcessor,
-    conversion_orchestrator,
-)
+
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
+
 from config import logger
+from services import AAXProcessor, AudiobookMetadataExtractor, conversion_orchestrator
 
 
 @asynccontextmanager
@@ -111,7 +109,7 @@ def delete_file(filename: str):
 
 @app.post("/convert/{filename}")
 def start_conversion(filename: str):
-    """Start AAX to M4A conversion in background"""
+    """Start AAX to M4B conversion in background"""
     try:
         # Validate filename
         if not filename.endswith(".aax"):
@@ -123,13 +121,13 @@ def start_conversion(filename: str):
 
         # Create output filename and path
         base_name = os.path.splitext(filename)[0]
-        m4a_filename = f"{base_name}.m4a"
-        m4a_file_path = os.path.join("uploads", m4a_filename)
+        m4b_filename = f"{base_name}.m4b"
+        m4b_file_path = os.path.join("uploads", m4b_filename)
 
         # Check if already converted and up to date
-        if os.path.exists(m4a_file_path) and os.path.getmtime(
+        if os.path.exists(m4b_file_path) and os.path.getmtime(
             aax_file_path
-        ) <= os.path.getmtime(m4a_file_path):
+        ) <= os.path.getmtime(m4b_file_path):
             return JSONResponse(
                 {
                     "status": "already_converted",
@@ -151,8 +149,8 @@ def start_conversion(filename: str):
         activation_bytes = result["activation_bytes"]
 
         # Start conversion using orchestrator
-        if conversion_orchestrator.start_m4a_conversion(
-            filename, aax_file_path, m4a_file_path, activation_bytes
+        if conversion_orchestrator.start_m4b_conversion(
+            filename, aax_file_path, m4b_file_path, activation_bytes
         ):
             return JSONResponse({"status": "started", "message": "Conversion started"})
         else:
@@ -166,7 +164,7 @@ def start_conversion(filename: str):
 
 
 @app.get("/convert/status/{filename}")
-def get_conversion_status(filename: str, conversion_type: str = "m4a"):
+def get_conversion_status(filename: str, conversion_type: str = "m4b"):
     """Get conversion progress status"""
     progress_data = conversion_orchestrator.get_conversion_status(
         filename, conversion_type
@@ -181,21 +179,21 @@ def get_active_conversions():
 
 
 @app.get("/download/{filename}")
-def download_m4a(filename: str):
-    """Download the converted M4A file"""
+def download_m4b(filename: str):
+    """Download the converted M4B file"""
     try:
         if not filename.endswith(".aax"):
             raise HTTPException(status_code=400, detail="Invalid file format")
 
         base_name = os.path.splitext(filename)[0]
-        m4a_filename = f"{base_name}.m4a"
-        m4a_file_path = os.path.join("uploads", m4a_filename)
+        m4b_filename = f"{base_name}.m4b"
+        m4b_file_path = os.path.join("uploads", m4b_filename)
 
-        if not os.path.exists(m4a_file_path):
+        if not os.path.exists(m4b_file_path):
             raise HTTPException(status_code=404, detail="Converted file not found")
 
         return FileResponse(
-            path=m4a_file_path, filename=m4a_filename, media_type="audio/mp4"
+            path=m4b_file_path, filename=m4b_filename, media_type="audio/mp4"
         )
 
     except Exception as e:

@@ -42,7 +42,7 @@ docker-compose -f docker-compose.dev.yml up --build
 2. **View Collection**: Browse uploaded files in the uploads section
 3. **Extract Details**: Click on any file to view detailed metadata and activation bytes
 4. **File Management**: Delete files directly from the web interface
-5. **Convert to M4A**: Convert the AAX file to an M4A file
+5. **Convert to M4B**: Convert the AAX file to an M4B file
 6. **Convert to MP3 Chapters**: Convert the AAX file to MP3 chapters
 
 ![home page](./docs/home.png)

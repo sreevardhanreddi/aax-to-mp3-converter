@@ -1,8 +1,9 @@
-import threading
+import atexit
 import signal
 import sys
-import atexit
-from typing import List, Callable, Optional
+import threading
+from typing import Callable, List, Optional
+
 from config import logger
 
 

@@ -1,7 +1,8 @@
 import threading
-from typing import Optional, List, Dict, Any
-from models import ConversionTracker
+from typing import Any, Dict, List, Optional
+
 from config import logger
+from models import ConversionTracker
 
 
 class ConversionService:
@@ -28,13 +29,13 @@ class ConversionService:
         self._initialized = True
         logger.info("ConversionService initialized")
 
-    def start_conversion(self, filename: str, conversion_type: str = "m4a") -> bool:
+    def start_conversion(self, filename: str, conversion_type: str = "m4b") -> bool:
         """
         Start tracking a conversion
 
         Args:
             filename: Name of the file being converted
-            conversion_type: Type of conversion ("m4a" or "mp3_chapters")
+            conversion_type: Type of conversion ("m4b" or "mp3_chapters")
 
         Returns:
             bool: True if conversion started, False if already in progress
@@ -54,7 +55,7 @@ class ConversionService:
         filename: str,
         progress: float,
         status: str = "converting",
-        conversion_type: str = "m4a",
+        conversion_type: str = "m4b",
     ):
         """Update conversion progress"""
         self._tracker.update_progress(filename, progress, status, conversion_type)
@@ -65,7 +66,7 @@ class ConversionService:
         success: bool = True,
         error_message: Optional[str] = None,
         result_path: Optional[str] = None,
-        conversion_type: str = "m4a",
+        conversion_type: str = "m4b",
     ):
         """Mark conversion as completed or failed"""
         self._tracker.complete_conversion(
@@ -76,12 +77,12 @@ class ConversionService:
         )
 
     def get_progress(
-        self, filename: str, conversion_type: str = "m4a"
+        self, filename: str, conversion_type: str = "m4b"
     ) -> Dict[str, Any]:
         """Get current progress for a file"""
         return self._tracker.get_progress(filename, conversion_type)
 
-    def is_conversion_active(self, filename: str, conversion_type: str = "m4a") -> bool:
+    def is_conversion_active(self, filename: str, conversion_type: str = "m4b") -> bool:
         """Check if conversion is currently active"""
         return self._tracker.is_conversion_active(filename, conversion_type)
 

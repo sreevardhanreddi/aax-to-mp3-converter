@@ -5,9 +5,9 @@
   <div class="mb-8">
     <h2 class="text-2xl font-bold mb-4">Uploaded AAX Files</h2>
     {% if uploads %}
-    <p class="text-gray-600 dark:text-gray-400">{{ uploads|length }} file(s) found</p>
+    <p class="text-stone-600 dark:text-stone-400">{{ uploads|length }} file(s) found</p>
     {% else %}
-    <p class="text-gray-600 dark:text-gray-400">No AAX files uploaded yet. <a href="/uploads"
+    <p class="text-stone-600 dark:text-stone-400">No AAX files uploaded yet. <a href="/uploads"
         class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Upload your first file</a>
     </p>
     {% endif %}
@@ -17,7 +17,7 @@
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for i in range(uploads|length) %}
     <div
-      class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 relative">
+      class="bg-white dark:bg-stone-800 rounded-lg shadow-md p-6 border border-stone-200 dark:border-stone-700 relative">
       <!-- Action buttons -->
       <div class="absolute top-4 right-4 flex space-x-2 z-10">
         <!-- View button -->
@@ -48,14 +48,14 @@
       {% endif %}
 
       <div class="mb-4">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <h3 class="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-2">
           {% if metadata[i] and metadata[i].title %}
           {{ metadata[i].title }}
           {% else %}
           {{ uploads[i] }}
           {% endif %}
         </h3>
-        <div class="text-sm text-gray-500 dark:text-gray-400 break-all">
+        <div class="text-sm text-stone-500 dark:text-stone-400 break-all">
           File: {{ uploads[i] }}
         </div>
       </div>
@@ -64,41 +64,41 @@
       <div class="space-y-3">
         {% if metadata[i].author %}
         <div>
-          <span class="font-medium text-gray-700 dark:text-gray-300">Author:</span>
-          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].author }}</span>
+          <span class="font-medium text-stone-700 dark:text-stone-300">Author:</span>
+          <span class="text-stone-900 dark:text-stone-100">{{ metadata[i].author }}</span>
         </div>
         {% endif %}
 
         {% if metadata[i].duration_formatted %}
         <div>
-          <span class="font-medium text-gray-700 dark:text-gray-300">Duration:</span>
-          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].duration_formatted }}</span>
+          <span class="font-medium text-stone-700 dark:text-stone-300">Duration:</span>
+          <span class="text-stone-900 dark:text-stone-100">{{ metadata[i].duration_formatted }}</span>
         </div>
         {% endif %}
 
         {% if metadata[i].size_formatted %}
         <div>
-          <span class="font-medium text-gray-700 dark:text-gray-300">Size:</span>
-          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].size_formatted }}</span>
+          <span class="font-medium text-stone-700 dark:text-stone-300">Size:</span>
+          <span class="text-stone-900 dark:text-stone-100">{{ metadata[i].size_formatted }}</span>
         </div>
         {% endif %}
 
         {% if metadata[i].bitrate %}
         <div>
-          <span class="font-medium text-gray-700 dark:text-gray-300">Bitrate:</span>
-          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].bitrate_formatted }}</span>
+          <span class="font-medium text-stone-700 dark:text-stone-300">Bitrate:</span>
+          <span class="text-stone-900 dark:text-stone-100">{{ metadata[i].bitrate_formatted }}</span>
         </div>
         {% endif %}
 
         {% if metadata[i].chapters %}
         <div>
-          <span class="font-medium text-gray-700 dark:text-gray-300">Chapters:</span>
-          <span class="text-gray-900 dark:text-gray-100">{{ metadata[i].chapters|length }}</span>
+          <span class="font-medium text-stone-700 dark:text-stone-300">Chapters:</span>
+          <span class="text-stone-900 dark:text-stone-100">{{ metadata[i].chapters|length }}</span>
         </div>
         {% endif %}
       </div>
       {% else %}
-      <div class="text-gray-500 dark:text-gray-400 italic">
+      <div class="text-stone-500 dark:text-stone-400 italic">
         No metadata available
       </div>
       {% endif %}

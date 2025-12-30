@@ -1,8 +1,10 @@
-from sqlmodel import SQLModel, create_engine, Session, select, Field, UniqueConstraint
-from typing import Optional, List
-from datetime import datetime
-from config import logger
 import threading
+from datetime import datetime
+from typing import List, Optional
+
+from sqlmodel import Field, Session, SQLModel, UniqueConstraint, create_engine, select
+
+from config import logger
 
 
 class Conversion(SQLModel, table=True):
@@ -15,7 +17,7 @@ class Conversion(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     filename: str = Field(index=True)
-    conversion_type: str = Field(default="m4a", index=True)  # "m4a" or "mp3_chapters"
+    conversion_type: str = Field(default="m4b", index=True)  # "m4b" or "mp3_chapters"
     status: str = Field(index=True)
     progress: float = Field(default=0.0)
     error_message: Optional[str] = Field(default=None)
@@ -44,7 +46,7 @@ class ConversionTracker:
             SQLModel.metadata.create_all(self.engine)
             logger.info("Database initialized successfully")
 
-    def start_conversion(self, filename: str, conversion_type: str = "m4a"):
+    def start_conversion(self, filename: str, conversion_type: str = "m4b"):
         """Mark conversion as started"""
         with self.lock:
             with Session(self.engine) as session:
@@ -86,7 +88,7 @@ class ConversionTracker:
         filename: str,
         progress: float,
         status: str = "converting",
-        conversion_type: str = "m4a",
+        conversion_type: str = "m4b",
     ):
         """Update conversion progress"""
         with self.lock:
@@ -110,7 +112,7 @@ class ConversionTracker:
         success: bool = True,
         error_message: Optional[str] = None,
         result_path: Optional[str] = None,
-        conversion_type: str = "m4a",
+        conversion_type: str = "m4b",
     ):
         """Mark conversion as completed or failed"""
         with self.lock:
@@ -138,7 +140,7 @@ class ConversionTracker:
                         f"{conversion_type} conversion completed for {filename}: {'success' if success else 'failed'}"
                     )
 
-    def get_progress(self, filename: str, conversion_type: str = "m4a") -> dict:
+    def get_progress(self, filename: str, conversion_type: str = "m4b") -> dict:
         """Get current progress for a file"""
         with Session(self.engine) as session:
             conversion = session.exec(
@@ -170,7 +172,7 @@ class ConversionTracker:
                     "conversion_type": conversion_type,
                 }
 
-    def is_conversion_active(self, filename: str, conversion_type: str = "m4a") -> bool:
+    def is_conversion_active(self, filename: str, conversion_type: str = "m4b") -> bool:
         """Check if conversion is currently active"""
         progress_data = self.get_progress(filename, conversion_type)
         return progress_data["status"] in ["starting", "converting"]

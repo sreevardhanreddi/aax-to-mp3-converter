@@ -13,7 +13,7 @@
   </div>
 
   {% if metadata %}
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+  <div class="bg-white dark:bg-stone-800 rounded-lg shadow-lg p-8">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
       <!-- Album Art Section -->
       {% if metadata.album_art %}
@@ -25,58 +25,58 @@
 
       <!-- Metadata Section -->
       <div class="{% if metadata.album_art %}md:col-span-2{% else %}md:col-span-3{% endif %}">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        <h1 class="text-3xl font-bold text-stone-900 dark:text-stone-100 mb-4">
           {{ metadata.title or filename }}
         </h1>
 
         <div class="space-y-4">
           {% if metadata.author %}
           <div>
-            <span class="text-lg font-semibold text-gray-700 dark:text-gray-300">Author:</span>
-            <span class="text-lg text-gray-900 dark:text-gray-100 ml-2">{{ metadata.author }}</span>
+            <span class="text-lg font-semibold text-stone-700 dark:text-stone-300">Author:</span>
+            <span class="text-lg text-stone-900 dark:text-stone-100 ml-2">{{ metadata.author }}</span>
           </div>
           {% endif %}
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {% if metadata.duration_formatted %}
             <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Duration:</span>
-              <span class="text-gray-900 dark:text-gray-100 ml-2">{{ metadata.duration_formatted }}</span>
+              <span class="font-medium text-stone-700 dark:text-stone-300">Duration:</span>
+              <span class="text-stone-900 dark:text-stone-100 ml-2">{{ metadata.duration_formatted }}</span>
             </div>
             {% endif %}
 
             {% if metadata.size_formatted %}
             <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">File Size:</span>
-              <span class="text-gray-900 dark:text-gray-100 ml-2">{{ metadata.size_formatted }}</span>
+              <span class="font-medium text-stone-700 dark:text-stone-300">File Size:</span>
+              <span class="text-stone-900 dark:text-stone-100 ml-2">{{ metadata.size_formatted }}</span>
             </div>
             {% endif %}
 
             {% if metadata.bitrate %}
             <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Bitrate:</span>
-              <span class="text-gray-900 dark:text-gray-100 ml-2">{{ metadata.bitrate_formatted }}</span>
+              <span class="font-medium text-stone-700 dark:text-stone-300">Bitrate:</span>
+              <span class="text-stone-900 dark:text-stone-100 ml-2">{{ metadata.bitrate_formatted }}</span>
             </div>
             {% endif %}
 
             <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Filename:</span>
-              <span class="text-gray-900 dark:text-gray-100 ml-2 break-all">{{ filename }}</span>
+              <span class="font-medium text-stone-700 dark:text-stone-300">Filename:</span>
+              <span class="text-stone-900 dark:text-stone-100 ml-2 break-all">{{ filename }}</span>
             </div>
           </div>
 
           {% if checksum and activation_bytes %}
-          <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">Authentication Info</h3>
+          <div class="mt-4 pt-4 border-t border-stone-200 dark:border-stone-600">
+            <h3 class="text-lg font-semibold text-stone-700 dark:text-stone-300 mb-3">Authentication Info</h3>
             <div class="grid grid-cols-1 gap-3">
               <div>
-                <span class="font-medium text-gray-700 dark:text-gray-300">Checksum:</span>
-                <span class="text-gray-900 dark:text-gray-100 ml-2 font-mono text-sm break-all">{{
+                <span class="font-medium text-stone-700 dark:text-stone-300">Checksum:</span>
+                <span class="text-stone-900 dark:text-stone-100 ml-2 font-mono text-sm break-all">{{
                   checksum }}</span>
               </div>
               <div>
-                <span class="font-medium text-gray-700 dark:text-gray-300">Activation Bytes:</span>
-                <span class="text-gray-900 dark:text-gray-100 ml-2 font-mono text-sm break-all">{{
+                <span class="font-medium text-stone-700 dark:text-stone-300">Activation Bytes:</span>
+                <span class="text-stone-900 dark:text-stone-100 ml-2 font-mono text-sm break-all">{{
                   activation_bytes }}</span>
               </div>
             </div>
@@ -85,7 +85,7 @@
             <div class="mt-4" id="download-section">
               <!-- Conversion Options -->
               <div class="space-y-3">
-                <!-- M4A Convert Button -->
+                <!-- M4B Convert Button -->
                 <button id="convert-btn" onclick="startConversion('{{ filename }}')"
                   class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-md">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24"
@@ -93,7 +93,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  <span id="convert-btn-text">Convert to M4A</span>
+                  <span id="convert-btn-text">Convert to M4B</span>
                 </button>
 
                 <!-- MP3 Chapters Convert Button -->
@@ -127,7 +127,7 @@
                       <span id="progress-text">Converting...</span>
                       <span id="progress-percentage">0%</span>
                     </div>
-                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="w-full bg-stone-200 dark:bg-stone-700 rounded-full h-2">
                       <div id="progress-bar" class="bg-green-600 h-2 rounded-full transition-all duration-300"
                         style="width: 0%"></div>
                     </div>
@@ -145,7 +145,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Download M4A File
+                  Download M4B File
                 </button>
 
                 <button id="download-mp3-btn" onclick="downloadMp3File('{{ filename }}')"
@@ -159,8 +159,8 @@
                 </button>
               </div>
 
-              <div id="conversion-info" class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                <p><strong>M4A:</strong> Single file format preserving the audiobook structure.</p>
+              <div id="conversion-info" class="text-sm text-stone-500 dark:text-stone-400 mt-2">
+                <p><strong>M4B:</strong> Single file audiobook format preserving chapters and bookmarks.</p>
                 <p><strong>MP3 Chapters (Sequential):</strong> Each chapter as a separate MP3 file with metadata and
                   album art, processed one at a time.</p>
                 <p><strong>MP3 Chapters (Parallel ⚡):</strong> Same as sequential but processes multiple chapters
@@ -175,17 +175,17 @@
 
     <!-- Chapters Section -->
     {% if metadata.chapters %}
-    <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
-      <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+    <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-8">
+      <h2 class="text-2xl font-bold text-stone-900 dark:text-stone-100 mb-6">
         Chapters ({{ metadata.chapters|length }})
       </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         {% for chapter in metadata.chapters %}
-        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-          <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <div class="bg-stone-50 dark:bg-stone-700 rounded-lg p-4">
+          <h3 class="font-semibold text-stone-900 dark:text-stone-100 mb-2">
             {{ chapter.title or "Chapter " + loop.index|string }}
           </h3>
-          <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+          <div class="text-sm text-stone-600 dark:text-stone-300 space-y-1">
             {% if chapter.duration_formatted %}
             <div><strong>Duration:</strong> {{ chapter.duration_formatted }}</div>
             {% endif %}
@@ -216,16 +216,16 @@
 
     <!-- Raw Metadata Section (Collapsible) -->
     {% if metadata.raw_metadata %}
-    <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+    <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-8">
       <details class="group">
-        <summary class="cursor-pointer text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        <summary class="cursor-pointer text-xl font-bold text-stone-900 dark:text-stone-100 mb-4">
           Raw Metadata
-          <span class="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
+          <span class="text-sm font-normal text-stone-500 dark:text-stone-400 ml-2">
             (Click to expand)
           </span>
         </summary>
-        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-auto">
-          <pre class="text-sm text-gray-800 dark:text-gray-200">{{ metadata.raw_metadata | tojson(indent=2) }}</pre>
+        <div class="bg-stone-50 dark:bg-stone-700 rounded-lg p-4 overflow-auto">
+          <pre class="text-sm text-stone-800 dark:text-stone-200">{{ metadata.raw_metadata | tojson(indent=2) }}</pre>
         </div>
       </details>
     </div>
@@ -242,10 +242,10 @@
 
 <script>
   let progressInterval;
-  let currentConversionType = 'm4a';
+  let currentConversionType = 'm4b';
 
   async function startConversion(filename) {
-    currentConversionType = 'm4a';
+    currentConversionType = 'm4b';
     const convertBtn = document.getElementById('convert-btn');
     const convertMp3Btn = document.getElementById('convert-mp3-btn');
     const convertMp3ParallelBtn = document.getElementById('convert-mp3-parallel-btn');
@@ -289,7 +289,7 @@
     }
   }
 
-  async function checkProgress(filename, conversionType = 'm4a') {
+  async function checkProgress(filename, conversionType = 'm4b') {
     try {
       const response = await fetch(`/convert/status/${encodeURIComponent(filename)}?conversion_type=${conversionType}`);
       const progress = await response.json();
@@ -301,7 +301,7 @@
         showDownloadButton(filename, conversionType);
         // Auto-download after a brief delay
         setTimeout(() => {
-          if (conversionType === 'm4a') {
+          if (conversionType === 'm4b') {
             downloadFile(filename);
           } else if (conversionType === 'mp3_chapters') {
             downloadMp3File(filename);
@@ -337,7 +337,7 @@
         if (currentConversionType === 'mp3_chapters') {
           progressText.textContent = 'Converting to MP3 chapters...';
         } else {
-          progressText.textContent = 'Converting to M4A...';
+          progressText.textContent = 'Converting to M4B...';
         }
         break;
       case 'completed':
@@ -348,7 +348,7 @@
     }
   }
 
-  function showDownloadButton(filename, conversionType = 'm4a') {
+  function showDownloadButton(filename, conversionType = 'm4b') {
     const progressSection = document.getElementById('progress-section');
     const downloadButtons = document.getElementById('download-buttons');
     const downloadBtn = document.getElementById('download-btn');
@@ -359,7 +359,7 @@
     spinner.classList.add('hidden');
     downloadButtons.classList.remove('hidden');
 
-    if (conversionType === 'm4a') {
+    if (conversionType === 'm4b') {
       downloadBtn.classList.remove('hidden');
       downloadMp3Btn.classList.add('hidden');
     } else if (conversionType === 'mp3_chapters') {

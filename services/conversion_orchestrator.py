@@ -1,9 +1,11 @@
 import os
-from typing import Optional, Callable
-from .thread_manager import thread_manager
+from typing import Callable, Optional
+
+from config import logger
+
 from .conversion_service import conversion_service
 from .extract_activation_bytes import AAXProcessor
-from config import logger
+from .thread_manager import thread_manager
 
 
 class ConversionOrchestrator:
@@ -52,27 +54,27 @@ class ConversionOrchestrator:
         self,
         filename: str,
         aax_file_path: str,
-        m4a_file_path: str,
+        m4b_file_path: str,
         activation_bytes: str,
     ):
         """Background function to handle file conversion with progress tracking"""
         try:
-            if os.path.exists(m4a_file_path):
-                os.remove(m4a_file_path)
+            if os.path.exists(m4b_file_path):
+                os.remove(m4b_file_path)
 
             # Start conversion tracking
-            if not conversion_service.start_conversion(filename, "m4a"):
+            if not conversion_service.start_conversion(filename, "m4b"):
                 logger.warning(f"Could not start conversion tracking for {filename}")
                 return
 
             # Create progress callback
-            progress_callback = self._create_progress_callback(filename, "m4a")
+            progress_callback = self._create_progress_callback(filename, "m4b")
 
             # Update status to converting
-            conversion_service.update_progress(filename, 0, "converting", "m4a")
+            conversion_service.update_progress(filename, 0, "converting", "m4b")
 
-            success = self.processor.convert_to_m4a(
-                aax_file_path, m4a_file_path, activation_bytes, progress_callback
+            success = self.processor.convert_to_m4b(
+                aax_file_path, m4b_file_path, activation_bytes, progress_callback
             )
 
             # Mark conversion as completed or failed
@@ -80,8 +82,8 @@ class ConversionOrchestrator:
                 conversion_service.complete_conversion(
                     filename,
                     success=True,
-                    result_path=m4a_file_path,
-                    conversion_type="m4a",
+                    result_path=m4b_file_path,
+                    conversion_type="m4b",
                 )
             else:
                 error_msg = (
@@ -93,13 +95,13 @@ class ConversionOrchestrator:
                     filename,
                     success=False,
                     error_message=error_msg,
-                    conversion_type="m4a",
+                    conversion_type="m4b",
                 )
 
         except Exception as e:
-            logger.error(f"Error in M4A conversion: {e}")
+            logger.error(f"Error in M4B conversion: {e}")
             conversion_service.complete_conversion(
-                filename, success=False, error_message=str(e), conversion_type="m4a"
+                filename, success=False, error_message=str(e), conversion_type="m4b"
             )
 
     def convert_mp3_chapters_background(
@@ -171,32 +173,32 @@ class ConversionOrchestrator:
                 conversion_type="mp3_chapters",
             )
 
-    def start_m4a_conversion(
+    def start_m4b_conversion(
         self,
         filename: str,
         aax_file_path: str,
-        m4a_file_path: str,
+        m4b_file_path: str,
         activation_bytes: str,
     ) -> bool:
-        """Start M4A conversion in background thread"""
+        """Start M4B conversion in background thread"""
         try:
             # Check if conversion is already in progress
-            if conversion_service.is_conversion_active(filename, "m4a"):
-                logger.warning(f"M4A conversion already in progress for {filename}")
+            if conversion_service.is_conversion_active(filename, "m4b"):
+                logger.warning(f"M4B conversion already in progress for {filename}")
                 return False
 
             # Start conversion in background thread
             thread_manager.start_thread(
                 target=self.convert_file_background,
-                args=(filename, aax_file_path, m4a_file_path, activation_bytes),
-                name=f"m4a_conversion_{filename}",
+                args=(filename, aax_file_path, m4b_file_path, activation_bytes),
+                name=f"m4b_conversion_{filename}",
             )
 
-            logger.info(f"Started M4A conversion thread for {filename}")
+            logger.info(f"Started M4B conversion thread for {filename}")
             return True
 
         except Exception as e:
-            logger.error(f"Error starting M4A conversion: {e}")
+            logger.error(f"Error starting M4B conversion: {e}")
             return False
 
     def start_mp3_conversion(
@@ -233,13 +235,13 @@ class ConversionOrchestrator:
             logger.error(f"Error starting MP3 conversion: {e}")
             return False
 
-    def get_conversion_status(self, filename: str, conversion_type: str = "m4a"):
+    def get_conversion_status(self, filename: str, conversion_type: str = "m4b"):
         """Get conversion progress status"""
         progress_data = conversion_service.get_progress(filename, conversion_type)
 
         # If completed, add download URL
         if progress_data["status"] == "completed":
-            if conversion_type == "m4a":
+            if conversion_type == "m4b":
                 progress_data["download_url"] = f"/download/{filename}"
             elif conversion_type == "mp3_chapters":
                 progress_data["download_url"] = f"/download/mp3/{filename}"

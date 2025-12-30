@@ -1,18 +1,20 @@
-import subprocess
-import re
-import os
-import json
-import sys
-import zipfile
-import tempfile
-from pathlib import Path
-from config import logger
-import requests
-from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TIT2, TPE1, TALB, TCON, APIC, TRCK, TPE2
 import concurrent.futures
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
 import threading
-from typing import Dict, Any, Optional, Callable
+import zipfile
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
+
+import requests
+from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TRCK
+from mutagen.mp3 import MP3
+
+from config import logger
 
 
 class AAXProcessor:
@@ -250,15 +252,15 @@ class AAXProcessor:
             logger.error("Could not get duration from AAX file")
             return None
 
-    def convert_to_m4a(
+    def convert_to_m4b(
         self, aax_file, output_path, activation_bytes, progress_callback=None
     ):
         """
-        Convert AAX file to M4A format using ffmpeg with progress tracking.
+        Convert AAX file to M4B format using ffmpeg with progress tracking.
 
         Args:
             aax_file (str): Path to the AAX file
-            output_path (str): Path for the output M4A file
+            output_path (str): Path for the output M4B file
             activation_bytes (str): Activation bytes for decryption
             progress_callback (callable): Function to call with progress updates
 
@@ -273,7 +275,7 @@ class AAXProcessor:
             if not total_duration:
                 logger.warning("Could not get duration, progress will be estimated")
 
-            # FFmpeg command to convert AAX to M4A
+            # FFmpeg command to convert AAX to M4B
             cmd = [
                 "ffmpeg",
                 "-activation_bytes",
@@ -282,6 +284,8 @@ class AAXProcessor:
                 aax_file,
                 "-c",
                 "copy",
+                "-map_chapters",
+                "0",  # Explicitly preserve chapters from input
                 "-progress",
                 "pipe:1",  # Output progress to stdout
                 "-y",  # Overwrite output file if it exists
@@ -379,7 +383,7 @@ class AAXProcessor:
                 return False
 
         except Exception as e:
-            logger.error(f"Error converting AAX to M4A: {e}")
+            logger.error(f"Error converting AAX to M4B: {e}")
             return False
 
     def convert_to_mp3_chapters(
@@ -443,8 +447,8 @@ class AAXProcessor:
                         "-i",
                         aax_file,
                         "-an",  # No audio
-                        "-vcodec",
-                        "copy",
+                        "-vf",
+                        "scale='min(500,iw)':'min(500,ih)':force_original_aspect_ratio=decrease",
                         "-map",
                         "0:v:0",  # Map first video stream (album art)
                         temp_art.name,
@@ -476,8 +480,8 @@ class AAXProcessor:
                             "-i",
                             aax_file,
                             "-an",
-                            "-vcodec",
-                            "copy",
+                            "-vf",
+                            "scale='min(500,iw)':'min(500,ih)':force_original_aspect_ratio=decrease",
                             temp_art.name,
                         ]
                         subprocess.run(alt_art_cmd, capture_output=True, check=True)
@@ -905,8 +909,8 @@ class AAXProcessor:
                         "-i",
                         aax_file,
                         "-an",  # No audio
-                        "-vcodec",
-                        "copy",
+                        "-vf",
+                        "scale='min(500,iw)':'min(500,ih)':force_original_aspect_ratio=decrease",
                         "-map",
                         "0:v:0",  # Map first video stream (album art)
                         temp_art.name,
@@ -938,8 +942,8 @@ class AAXProcessor:
                             "-i",
                             aax_file,
                             "-an",
-                            "-vcodec",
-                            "copy",
+                            "-vf",
+                            "scale='min(500,iw)':'min(500,ih)':force_original_aspect_ratio=decrease",
                             temp_art.name,
                         ]
                         subprocess.run(alt_art_cmd, capture_output=True, check=True)

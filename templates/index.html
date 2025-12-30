@@ -3,15 +3,15 @@
 {% block content %}
 <div class="max-w-xl mx-auto">
   <form id="upload-form" action="/upload/file/aax" method="post" enctype="multipart/form-data"
-    class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 shadow-md flex flex-col gap-4">
+    class="bg-stone-50 dark:bg-stone-800 rounded-lg p-6 shadow-md flex flex-col gap-4">
     <label for="file-upload" class="block text-lg font-medium mb-2">Upload AAX File</label>
     <div id="drop-area"
-      class="flex flex-col items-center justify-center border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg p-8 cursor-pointer transition hover:bg-gray-100 dark:hover:bg-gray-700">
-      <svg class="w-12 h-12 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      class="flex flex-col items-center justify-center border-2 border-dashed border-stone-400 dark:border-stone-600 rounded-lg p-8 cursor-pointer transition hover:bg-stone-100 dark:hover:bg-stone-700">
+      <svg class="w-12 h-12 mb-2 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M7 16v-4a4 4 0 018 0v4m1 4H6a2 2 0 01-2-2v-5a2 2 0 012-2h.586a1 1 0 00.707-.293l2.414-2.414a2 2 0 012.828 0l2.414 2.414a1 1 0 00.707.293H18a2 2 0 012 2v5a2 2 0 01-2 2z" />
       </svg>
-      <span class="text-gray-500 dark:text-gray-300">Drag & drop your .aax file here, or click to select</span>
+      <span class="text-stone-500 dark:text-stone-300">Drag & drop your .aax file here, or click to select</span>
       <input id="file-upload" name="file" type="file" accept=".aax" class="hidden" required />
     </div>
     <button type="submit"
@@ -19,7 +19,7 @@
   </form>
 
   {% if metadata %}
-  <div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+  <div class="mt-8 bg-white dark:bg-stone-800 rounded-lg shadow p-6">
     <h2 class="text-xl font-bold mb-4">Audiobook Metadata</h2>
     <ul class="space-y-2">
       <li><strong>Title:</strong> {{ metadata.title }}</li>
@@ -51,15 +51,15 @@
   dropArea.addEventListener('click', () => fileInput.click());
   dropArea.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropArea.classList.add('bg-gray-200', 'dark:bg-gray-600');
+    dropArea.classList.add('bg-stone-200', 'dark:bg-stone-600');
   });
   dropArea.addEventListener('dragleave', (e) => {
     e.preventDefault();
-    dropArea.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+    dropArea.classList.remove('bg-stone-200', 'dark:bg-stone-600');
   });
   dropArea.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropArea.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+    dropArea.classList.remove('bg-stone-200', 'dark:bg-stone-600');
     if (e.dataTransfer.files.length) {
       fileInput.files = e.dataTransfer.files;
     }
