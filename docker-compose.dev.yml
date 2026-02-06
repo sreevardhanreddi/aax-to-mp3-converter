@@ -11,3 +11,44 @@ services:
       - /app/audible_rainbow_tables
     env_file:
       - .env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      - redis
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: app-worker
+    command: celery -A tasks.celery_app:celery_app worker --loglevel=info --concurrency=4
+    volumes:
+      - .:/app
+      - /app/audible_rainbow_tables
+    env_file:
+      - .env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      - redis
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: app-redis
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

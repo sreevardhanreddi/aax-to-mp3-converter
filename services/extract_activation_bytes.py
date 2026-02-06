@@ -511,9 +511,9 @@ class AAXProcessor:
             total_chapters = len(chapters)
 
             for i, chapter in enumerate(chapters):
-                chapter_start = float(chapter.get("start_time", 0))
-                chapter_end = float(chapter.get("end_time", 0))
-                duration = chapter_end - chapter_start
+                chapter_start = round(float(chapter.get("start_time", 0)), 3)
+                chapter_end = round(float(chapter.get("end_time", 0)), 3)
+                duration = round(chapter_end - chapter_start, 3)
 
                 # Get chapter title
                 chapter_tags = chapter.get("tags", {})
@@ -531,12 +531,20 @@ class AAXProcessor:
                 mp3_path = os.path.join(temp_dir, mp3_filename)
 
                 # Convert chapter to MP3
+                # Note: -ss and -t are placed AFTER -i for output seeking, which is
+                # more accurate and reliable for encrypted AAX files
                 chapter_cmd = [
                     "ffmpeg",
                     "-activation_bytes",
                     activation_bytes,
                     "-i",
                     aax_file,
+                    # Audio-only mapping avoids buffering issues from attached art/data streams.
+                    "-map",
+                    "0:a:0",
+                    "-vn",
+                    "-sn",
+                    "-dn",
                     "-ss",
                     str(chapter_start),
                     "-t",
@@ -551,7 +559,12 @@ class AAXProcessor:
                     mp3_path,
                 ]
 
-                subprocess.run(chapter_cmd, capture_output=True, check=True)
+                result = subprocess.run(chapter_cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    logger.error(f"FFmpeg failed for chapter {i + 1}: {result.stderr}")
+                    raise subprocess.CalledProcessError(
+                        result.returncode, chapter_cmd, result.stdout, result.stderr
+                    )
 
                 # Add metadata to MP3 file
                 if os.path.exists(mp3_path):
@@ -663,8 +676,11 @@ class AAXProcessor:
             }
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"FFmpeg error during MP3 conversion: {e}")
-            return {"success": False, "error": f"FFmpeg error: {e}"}
+            stderr_msg = e.stderr if e.stderr else "No stderr captured"
+            logger.error(
+                f"FFmpeg error during MP3 conversion: {e}\nFFmpeg stderr: {stderr_msg}"
+            )
+            return {"success": False, "error": f"FFmpeg error: {stderr_msg}"}
         except Exception as e:
             logger.error(f"Error converting AAX to MP3 chapters: {e}")
             return {"success": False, "error": str(e)}
@@ -703,9 +719,9 @@ class AAXProcessor:
             chapter = chapter_data["chapter"]
             tags = chapter_data["tags"]
 
-            chapter_start = float(chapter.get("start_time", 0))
-            chapter_end = float(chapter.get("end_time", 0))
-            duration = chapter_end - chapter_start
+            chapter_start = round(float(chapter.get("start_time", 0)), 3)
+            chapter_end = round(float(chapter.get("end_time", 0)), 3)
+            duration = round(chapter_end - chapter_start, 3)
 
             # Get chapter title
             chapter_tags = chapter.get("tags", {})
@@ -723,12 +739,21 @@ class AAXProcessor:
             mp3_path = os.path.join(temp_dir, mp3_filename)
 
             # Convert chapter to MP3
+            # Note: -ss and -t are placed AFTER -i for output seeking, which is
+            # more accurate and reliable for encrypted AAX files (input seeking
+            # can cause issues with DRM-protected content)
             chapter_cmd = [
                 "ffmpeg",
                 "-activation_bytes",
                 activation_bytes,
                 "-i",
                 aax_file,
+                # Audio-only mapping avoids buffering issues from attached art/data streams.
+                "-map",
+                "0:a:0",
+                "-vn",
+                "-sn",
+                "-dn",
                 "-ss",
                 str(chapter_start),
                 "-t",
@@ -743,7 +768,12 @@ class AAXProcessor:
                 mp3_path,
             ]
 
-            subprocess.run(chapter_cmd, capture_output=True, check=True)
+            result = subprocess.run(chapter_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"FFmpeg failed for chapter {i + 1}: {result.stderr}")
+                raise subprocess.CalledProcessError(
+                    result.returncode, chapter_cmd, result.stdout, result.stderr
+                )
 
             # Add metadata to MP3 file
             if os.path.exists(mp3_path):
@@ -831,6 +861,31 @@ class AAXProcessor:
         except Exception as e:
             logger.error(f"Error converting chapter {i + 1}: {e}")
             return None
+
+    def convert_single_chapter_for_task(
+        self,
+        chapter_index: int,
+        chapter: Dict[str, Any],
+        tags: Dict[str, Any],
+        aax_file: str,
+        activation_bytes: str,
+        temp_dir: str,
+        album_art_data: Optional[bytes],
+        total_chapters: int,
+    ) -> Optional[str]:
+        """Task-safe wrapper for converting a single chapter."""
+        chapter_data = {"index": chapter_index, "chapter": chapter, "tags": tags}
+        return self._convert_single_chapter(
+            chapter_data=chapter_data,
+            aax_file=aax_file,
+            activation_bytes=activation_bytes,
+            temp_dir=temp_dir,
+            album_art_data=album_art_data,
+            total_chapters=total_chapters,
+            progress_lock=threading.Lock(),
+            processed_count=[0],
+            progress_callback=None,
+        )
 
     def convert_to_mp3_chapters_parallel(
         self,
@@ -1062,8 +1117,11 @@ class AAXProcessor:
             }
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"FFmpeg error during parallel MP3 conversion: {e}")
-            return {"success": False, "error": f"FFmpeg error: {e}"}
+            stderr_msg = e.stderr if e.stderr else "No stderr captured"
+            logger.error(
+                f"FFmpeg error during parallel MP3 conversion: {e}\nFFmpeg stderr: {stderr_msg}"
+            )
+            return {"success": False, "error": f"FFmpeg error: {stderr_msg}"}
         except Exception as e:
             logger.error(f"Error converting AAX to MP3 chapters (parallel): {e}")
             return {"success": False, "error": str(e)}

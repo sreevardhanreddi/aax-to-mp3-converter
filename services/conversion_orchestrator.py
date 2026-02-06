@@ -56,6 +56,7 @@ class ConversionOrchestrator:
         aax_file_path: str,
         m4b_file_path: str,
         activation_bytes: str,
+        start_tracking: bool = True,
     ):
         """Background function to handle file conversion with progress tracking"""
         try:
@@ -63,7 +64,9 @@ class ConversionOrchestrator:
                 os.remove(m4b_file_path)
 
             # Start conversion tracking
-            if not conversion_service.start_conversion(filename, "m4b"):
+            if start_tracking and not conversion_service.start_conversion(
+                filename, "m4b"
+            ):
                 logger.warning(f"Could not start conversion tracking for {filename}")
                 return
 
@@ -111,11 +114,14 @@ class ConversionOrchestrator:
         output_dir: str,
         activation_bytes: str,
         parallel: bool = False,
+        start_tracking: bool = True,
     ):
         """Background function to handle MP3 chapter conversion with progress tracking"""
         try:
             # Start conversion tracking
-            if not conversion_service.start_conversion(filename, "mp3_chapters"):
+            if start_tracking and not conversion_service.start_conversion(
+                filename, "mp3_chapters"
+            ):
                 logger.warning(
                     f"Could not start MP3 conversion tracking for {filename}"
                 )

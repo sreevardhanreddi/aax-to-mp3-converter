@@ -2,14 +2,23 @@ import json
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from config import logger
-from services import AAXProcessor, AudiobookMetadataExtractor, conversion_orchestrator
+from services import (
+    AAXProcessor,
+    AudiobookMetadataExtractor,
+    conversion_orchestrator,
+    conversion_service,
+)
+from tasks.conversion_tasks import (
+    convert_m4b_task,
+    convert_mp3_chapters_task,
+    mark_queue_failure,
+)
 
 
 @asynccontextmanager
@@ -148,11 +157,23 @@ def start_conversion(filename: str):
 
         activation_bytes = result["activation_bytes"]
 
-        # Start conversion using orchestrator
-        if conversion_orchestrator.start_m4b_conversion(
-            filename, aax_file_path, m4b_file_path, activation_bytes
-        ):
-            return JSONResponse({"status": "started", "message": "Conversion started"})
+        # Start conversion tracking before queueing Celery task
+        if conversion_service.start_conversion(filename, "m4b"):
+            try:
+                task_result = convert_m4b_task.delay(
+                    filename, aax_file_path, m4b_file_path, activation_bytes
+                )
+            except Exception as task_error:
+                mark_queue_failure(filename, "m4b", f"Queue error: {task_error}")
+                raise
+
+            return JSONResponse(
+                {
+                    "status": "started",
+                    "message": "Conversion started",
+                    "task_id": task_result.id,
+                }
+            )
         else:
             return JSONResponse(
                 {"status": "in_progress", "message": "Conversion already in progress"}
@@ -249,14 +270,23 @@ def start_mp3_conversion(filename: str):
 
         activation_bytes = result["activation_bytes"]
 
-        # Start conversion using orchestrator (sequential by default)
-        if conversion_orchestrator.start_mp3_conversion(
-            filename, aax_file_path, output_dir, activation_bytes, parallel=False
-        ):
+        # Start conversion tracking before queueing Celery task
+        if conversion_service.start_conversion(filename, "mp3_chapters"):
+            try:
+                task_result = convert_mp3_chapters_task.delay(
+                    filename, aax_file_path, output_dir, activation_bytes
+                )
+            except Exception as task_error:
+                mark_queue_failure(
+                    filename, "mp3_chapters", f"Queue error: {task_error}"
+                )
+                raise
+
             return JSONResponse(
                 {
                     "status": "started",
-                    "message": "MP3 chapters conversion started (sequential)",
+                    "message": "MP3 chapters conversion started",
+                    "task_id": task_result.id,
                 }
             )
         else:
@@ -269,62 +299,6 @@ def start_mp3_conversion(filename: str):
 
     except Exception as e:
         logger.error(f"Error starting MP3 conversion: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/convert/mp3/parallel/{filename}")
-def start_mp3_conversion_parallel(filename: str, max_workers: Optional[int] = None):
-    """Start AAX to MP3 chapters conversion in background with parallel processing"""
-    try:
-        # Validate filename
-        if not filename.endswith(".aax"):
-            raise HTTPException(status_code=400, detail="Invalid file format")
-
-        aax_file_path = os.path.join("uploads", filename)
-        if not os.path.exists(aax_file_path):
-            raise HTTPException(status_code=404, detail="AAX file not found")
-
-        # Create output directory for zip file
-        output_dir = "uploads"
-
-        # Get activation bytes
-        processor = AAXProcessor()
-        result = processor.get_activation_bytes(aax_file_path)
-
-        if "error" in result:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Could not get activation bytes: {result['error']}",
-            )
-
-        activation_bytes = result["activation_bytes"]
-
-        # Start parallel conversion using orchestrator
-        if conversion_orchestrator.start_mp3_conversion(
-            filename, aax_file_path, output_dir, activation_bytes, parallel=True
-        ):
-            # Determine worker count for user feedback
-            if max_workers is None:
-                max_workers = min(os.cpu_count() or 4, 4)
-
-            return JSONResponse(
-                {
-                    "status": "started",
-                    "message": f"MP3 chapters conversion started (parallel with {max_workers} workers)",
-                    "parallel": True,
-                    "max_workers": max_workers,
-                }
-            )
-        else:
-            return JSONResponse(
-                {
-                    "status": "in_progress",
-                    "message": "MP3 conversion already in progress",
-                }
-            )
-
-    except Exception as e:
-        logger.error(f"Error starting parallel MP3 conversion: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
